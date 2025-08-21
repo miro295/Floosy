@@ -1,0 +1,49 @@
+<!-- public/services-login.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل دخول الخدمات — Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{ --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --primary:#22c55e; --border:rgba(148,163,184,.15); --shadow:0 12px 35px rgba(0,0,0,.35); }
+    body{margin:0;display:grid;place-items:center;min-height:100vh;background:linear-gradient(180deg,#0b1220 0%,#0f172a 100%);color:var(--text);font-family:system-ui, sans-serif}
+    .card{width:92%;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:18px}
+    h1{margin:0 0 8px}
+    label{display:block;color:var(--muted);font-size:14px;margin-top:8px}
+    input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)}
+    .btn{margin-top:12px;width:100%;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--primary),#10b981);color:#062b1a;font-weight:800;cursor:pointer}
+    .msg{margin-top:10px;padding:10px;border-radius:10px;display:none}
+    .err{background:#7f1d1d;color:#fee2e2}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>الخدمات (حسابات مصرح لها)</h1>
+    <div class="muted">أدخل هاتفك وكلمة المرور.</div>
+    <label>الهاتف</label>
+    <input id="phone" placeholder="0912345678" />
+    <label>كلمة المرور</label>
+    <input id="pass" type="password" placeholder="••••••••" />
+    <button class="btn" id="login">دخول</button>
+    <div id="msg" class="msg err"></div>
+  </div>
+
+  <script>
+    const msg = (t)=>{ const m=document.getElementById('msg'); m.textContent=t; m.style.display='block'; };
+    document.getElementById('login').addEventListener('click', async ()=>{
+      const phone = document.getElementById('phone').value.trim();
+      const password = document.getElementById('pass').value;
+      try{
+        const r = await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,password})});
+        const d = await r.json().catch(()=>({}));
+        if(!r.ok) return msg(d.error||'فشل الدخول');
+        localStorage.setItem('floosy_token', d.token);
+        localStorage.setItem('floosy_phone', phone);
+        if(Number(d?.user?.allow_services)!==1) return msg('حسابك غير مخوّل لاستخدام هذه الصفحة.');
+        location.href='/services.html';
+      }catch{ msg('تعذر الاتصال'); }
+    });
+  </script>
+</body>
+</html>

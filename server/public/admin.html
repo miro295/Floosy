@@ -1,0 +1,472 @@
+<!-- public/admin.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>لوحة الإدارة - Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <style>
+    :root{
+      --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
+      --primary:#22c55e; --primary-2:#10b981; --accent:#38bdf8;
+      --danger:#ef4444; --warning:#f59e0b; --ring:rgba(56,189,248,.25);
+      --shadow:0 12px 35px rgba(0,0,0,.35); --radius:16px; --border:rgba(148,163,184,.15);
+    }
+    *{box-sizing:border-box}
+    body{margin:0; background:linear-gradient(180deg,#0b1220 0%,#0f172a 100%); color:var(--text);
+         font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial; min-height:100dvh;}
+    .wrap{max-width:1200px; margin-inline:auto; padding:20px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    .brand{display:flex; align-items:center; gap:10px}
+    .logo{width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,var(--primary),var(--accent)); box-shadow:0 6px 18px rgba(34,197,94,.35)}
+    h1{font-size:18px; margin:0}
+    .pill{display:inline-flex; gap:8px; align-items:center; border:1px solid var(--border); border-radius:999px; padding:6px 10px; background:#0b1324}
+    .grid{display:grid; gap:16px; grid-template-columns: 1fr 1.2fr;}
+    @media(max-width:980px){ .grid{ grid-template-columns: 1fr } }
+    .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .section{ padding:16px }
+    .muted{ color:var(--muted); font-size:13px}
+    input,select,textarea{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:#0b1324; color:#e5e7eb; outline:none }
+    input:focus,select:focus,textarea:focus{ box-shadow:0 0 0 6px var(--ring); border-color: var(--accent) }
+.btn{
+  padding:10px 14px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:#0b1324;
+  color:var(--text); /* ✅ شِلّ الـ # */
+  cursor:pointer;
+}
+    .btn:hover{ border-color:#334155 }
+    .btn.primary{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#062b1a; border:none; font-weight:700 }
+    .btn.warning{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#3a2202; border:none; font-weight:700 }
+    .btn.danger{ background:linear-gradient(135deg,#ef4444,#f87171); color:#3a0606; border:none; font-weight:700 }
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .list{display:grid; gap:10px}
+    .item{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px; border:1px solid var(--border); background:#0b1324; border-radius:12px}
+    .table{width:100%; border-collapse:collapse}
+    .table th,.table td{ padding:10px; border-bottom:1px solid var(--border); text-align:right; font-size:14px}
+    .table th{ color:#cbd5e1; font-weight:600 }
+    .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .hint{font-size:12px; color:var(--muted)}
+    .status{font-size:12px; border-radius:999px; padding:2px 8px; border:1px solid}
+    .status.on{ color:#10b981; border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.08)}
+    .status.off{ color:#f87171; border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.08)}
+    .badge{font-size:12px; border:1px solid rgba(99,102,241,.35); background:rgba(99,102,241,.08); color:#a5b4fc; padding:2px 8px; border-radius:999px}
+    .stack{display:grid; gap:10px}
+    .split{display:grid; gap:10px; grid-template-columns: 1fr 1fr}
+    @media(max-width:560px){ .split{ grid-template-columns: 1fr } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand"><div class="logo"></div><h1>لوحة الإدارة — Floosy</h1></div>
+      <div class="pill" id="admin-pill">وضع إداري</div>
+    </header>
+
+    <!-- إنشاء عميل جديد -->
+    <div class="card section">
+      <h3 style="margin:0 0 10px">إنشاء حساب عميل</h3>
+      <div class="row">
+        <input id="nu_full" placeholder="الاسم الكامل">
+        <input id="nu_phone" placeholder="الهاتف (0912345678)">
+        <input id="nu_email" placeholder="البريد (اختياري)">
+        <input id="nu_pass" type="password" placeholder="كلمة المرور">
+        <button class="btn primary" id="btn-create-user">إنشاء</button>
+      </div>
+      <div class="hint">* ينشئ حساب جاهز للدخول. البريد اختياري ويمكن تأكيده لاحقًا.</div>
+    </div>
+
+    <!-- شريط أدوات -->
+    <div class="card section">
+      <div class="toolbar" style="gap:12px">
+        <input id="q" placeholder="بحث بالاسم / الهاتف / الإيميل" style="flex:1 1 320px">
+        <select id="filter-status" style="max-width:160px">
+          <option value="">الحالة (الكل)</option>
+          <option value="1">مفعّل</option>
+          <option value="0">غير مفعّل</option>
+        </select>
+        <select id="filter-verified" style="max-width:180px">
+          <option value="">تأكيد البريد (الكل)</option>
+          <option value="1">مؤكَّد</option>
+          <option value="0">غير مؤكد</option>
+        </select>
+        <button class="btn" id="btn-search">بحث</button>
+        <button class="btn" id="btn-load-all">تحميل كل المستخدمين</button>
+        <span class="hint">اضغط على المستخدم لعرض ملفه وسجلّه.</span>
+        <button class="btn danger" id="btn-logout" style="margin-inline-start:auto">خروج الأدمن</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- القائمة -->
+      <div class="card section">
+        <h3 style="margin:0 0 10px">المستخدمون</h3>
+        <div id="users-empty" class="muted" style="margin-top:10px">ابدأ بالبحث أو اختر "تحميل كل المستخدمين".</div>
+        <div id="users-list" class="list" style="margin-top:10px"></div>
+      </div>
+
+      <!-- التفاصيل -->
+      <div class="card section">
+        <h3 style="margin:0 0 10px">ملف المستخدم</h3>
+        <div id="user-box" class="list">
+          <div class="muted">لا يوجد مستخدم محدد بعد.</div>
+        </div>
+
+        <div id="actions" style="display:none; margin-top:12px" class="stack">
+          <div class="split">
+            <div>
+              <div class="hint" style="margin:6px 0">تعبئة / سحب (إداري)</div>
+              <div class="row">
+                <input id="amount" type="number" placeholder="المبلغ (+ للتعبئة | - للسحب)">
+                <button class="btn primary" id="btn-apply">تنفيذ</button>
+              </div>
+            </div>
+            <div>
+              <div class="hint" style="margin:6px 0">حالة الحساب</div>
+              <div class="row">
+                <button class="btn warning" id="btn-toggle-active">تبديل التفعيل</button>
+                <span id="status-chip" class="status off">غير مفعّل</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card section" style="padding:12px">
+            <div class="row" style="justify-content:space-between; align-items:center">
+              <h3 style="margin:0">سجل التحركات</h3>
+              <button class="btn" id="btn-refresh-tx">تحديث</button>
+            </div>
+            <table class="table" id="tx-table">
+              <thead>
+                <tr>
+                  <th>التاريخ</th>
+                  <th>النوع</th>
+                  <th>المبلغ</th>
+                  <th>بعد العملية</th>
+                  <th>تفاصيل</th>
+                </tr>
+              </thead>
+              <tbody><tr><td class="muted" colspan="5">— لا بيانات —</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- طلبات التعبئة/السحب -->
+    <div class="card section" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <h3 style="margin:0">طلبات التعبئة/السحب</h3>
+        <div class="row">
+          <select id="rq-status" style="max-width:180px">
+            <option value="pending">معلّقة</option>
+            <option value="approved">موافق عليها</option>
+            <option value="rejected">مرفوضة</option>
+            <option value="">الكل</option>
+          </select>
+          <select id="rq-type" style="max-width:160px">
+            <option value="">الكل (النوع)</option>
+            <option value="topup">تعبئة</option>
+            <option value="withdraw">سحب</option>
+          </select>
+          <button class="btn" id="btn-load-requests">تحميل</button>
+        </div>
+      </div>
+      <table class="table" id="rq-table" style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>المستخدم</th>
+            <th>الهاتف</th>
+            <th>النوع</th>
+            <th>المبلغ</th>
+            <th>الحالة</th>
+            <th>اجراء</th>
+          </tr>
+        </thead>
+        <tbody><tr><td class="muted" colspan="7">— لا بيانات —</td></tr></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:14px" class="muted">نصيحة: راجع الطلبات المعلّقة أولًا.</div>
+  </div>
+
+  <script>
+    // ===== Helpers =====
+    let ADMIN_CSRF = '';
+
+    function toLogin(){ location.href = '/admin-login.html'; }
+
+    function isDeviceError(obj){
+      try{
+        const msg = (obj?.error || obj?.message || '').toString().toLowerCase();
+        return msg.includes('device') || msg.includes('جهاز');
+      }catch{ return false; }
+    }
+
+    async function ensureSession(){
+      const r = await fetch('/admin/session', { cache:'no-store' });
+      if(!r.ok){
+        // لو ما وصلنا هنا إلا وكان /admin تعدّى الـ gate، بس احتياط لو انتهت الجلسة:
+        try{
+          const d = await r.json();
+          if(isDeviceError(d)) return toLogin();
+        }catch{}
+        return toLogin();
+      }
+      const d = await r.json();
+      ADMIN_CSRF = d.csrf || '';
+      const pill = document.getElementById('admin-pill');
+      pill.textContent = `وضع إداري — ${d?.admin?.username || ''} (${d?.admin?.role || ''})`;
+    }
+
+    function authHeaders(extra={}){
+      const h = { 'Content-Type':'application/json' };
+      if(ADMIN_CSRF) h['x-csrf-token'] = ADMIN_CSRF;
+      return { ...h, ...extra };
+    }
+
+    // http JSON wrapper: يحوّل تلقائيًا لصفحة الدخول عند 401/403
+    async function httpJSON(url, opts={}){
+      const r = await fetch(url, { ...opts, headers: authHeaders(opts.headers||{}), cache:'no-store' });
+      let data=null; try{ data = await r.json(); }catch(e){}
+      if(r.status===401 || r.status===403){
+        if(isDeviceError(data)) { toLogin(); return { ok:false, status:r.status, data }; }
+        // أي رفض دخول آخر → اطلع لصفحة الدخول
+        toLogin(); return { ok:false, status:r.status, data };
+      }
+      return { ok:r.ok, status:r.status, data };
+    }
+
+    const usersList = document.getElementById('users-list');
+    const usersEmpty = document.getElementById('users-empty');
+    const userBox   = document.getElementById('user-box');
+    const actions   = document.getElementById('actions');
+    const statusChip= document.getElementById('status-chip');
+
+    function fmt(n){ try { return new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); } catch { return Number(n||0).toFixed(2); } }
+    function fmtDate(iso){ const d=new Date(iso); if(isNaN(d)) return iso||''; return d.toLocaleString('en-GB',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}); }
+
+    let CURRENT = null;
+
+    function renderUserBox(u){
+      userBox.innerHTML = `
+        <div class="item"><div class="row" style="gap:8px;align-items:center">
+          <span class="badge">#${u.id ?? '-'}</span>
+          <b>${u.full_name ?? '—'}</b>
+        </div></div>
+        <div class="item"><div>الهاتف</div><div>${u.phone ?? '—'}</div></div>
+        <div class="item"><div>البريد</div><div>${u.email ?? '—'}</div></div>
+        <div class="item"><div>الرصيد</div><div><b>${fmt(u.balance)}</b> LYD</div></div>
+        <div class="item"><div>تأكيد البريد</div><div>${Number(u.email_verified)?'<span class="status on">مؤكَّد</span>':'<span class="status off">غير مؤكد</span>'}</div></div>
+        <div class="item"><div>حالة الحساب</div><div>${Number(u.is_active)?'<span class="status on">مفعّل</span>':'<span class="status off">غير مفعّل</span>'}</div></div>
+        <div class="item"><div>منذ</div><div>${(u.created_at ?? '').toString().slice(0,19)}</div></div>
+      `;
+      statusChip.className = 'status ' + (Number(u.is_active)?'on':'off');
+      statusChip.textContent = Number(u.is_active)?'مفعّل':'غير مفعّل';
+      actions.style.display = 'block';
+    }
+
+    function addUserRow(u){
+      usersEmpty.style.display = 'none';
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `
+        <div class="row" style="gap:10px;align-items:center">
+          <span class="badge">#${u.id}</span>
+          <div>
+            <div>${u.full_name}</div>
+            <div class="muted" style="font-size:12px">${u.phone} — ${u.email||''}</div>
+          </div>
+        </div>
+        <div>${Number(u.is_active)?'<span class="status on">مفعّل</span>':'<span class="status off">غير مفعّل</span>'}</div>
+      `;
+      row.addEventListener('click', ()=> selectUser(u));
+      usersList.appendChild(row);
+    }
+
+    function resetUsers(){
+      usersList.innerHTML = '';
+      usersEmpty.style.display = 'block';
+      actions.style.display = 'none';
+      CURRENT = null;
+    }
+
+    async function searchUsers(){
+      resetUsers();
+      const q = document.getElementById('q').value.trim();
+      const st = document.getElementById('filter-status').value;
+      const vf = document.getElementById('filter-verified').value;
+      const res = await httpJSON('/admin/search-user?q=' + encodeURIComponent(q || '') + '&is_active=' + st + '&verified=' + vf);
+      if(!res.ok){ return alert('تعذر البحث (تحقق من الجلسة/CSRF)'); }
+      const arr = res.data?.users || [];
+      if(arr.length===0){ usersEmpty.textContent = 'لا نتائج.'; return; }
+      arr.forEach(addUserRow);
+    }
+
+    async function loadAll(){
+      resetUsers();
+      const st = document.getElementById('filter-status').value;
+      const vf = document.getElementById('filter-verified').value;
+      const res = await httpJSON('/admin/users?is_active=' + st + '&verified=' + vf);
+      if(!res.ok){ return alert('تعذر التحميل (تحقق من الجلسة/CSRF)'); }
+      const arr = res.data || [];
+      if(arr.length===0){ usersEmpty.textContent = 'ما فيش مستخدمين.'; return; }
+      arr.forEach(addUserRow);
+    }
+
+    function selectUser(u){
+      CURRENT = u;
+      renderUserBox(u);
+      loadUserTx(u.id);
+      try { localStorage.setItem('last_admin_user', JSON.stringify(u)); } catch(e){}
+    }
+
+    async function applyBalance(){
+      if(!CURRENT) return alert('اختَر مستخدم أولاً');
+      const raw = document.getElementById('amount').value.trim();
+      const amount = Number(raw);
+      if(!Number.isFinite(amount) || amount === 0) return alert('أدخل مبلغ صحيح (+ للتعبئة | - للسحب)');
+      const res = await httpJSON('/admin/update-balance', { method:'POST', body: JSON.stringify({ phone: CURRENT.phone, amount }) });
+      if(!res.ok) return alert(res.data?.error || 'تعذر تعديل الرصيد');
+      if(res.data?.user){ CURRENT = res.data.user; renderUserBox(CURRENT); }
+      document.getElementById('amount').value = '';
+      alert('تم التحديث ✅');
+    }
+
+    async function toggleActive(){
+      if(!CURRENT) return alert('اختَر مستخدم أولاً');
+      const res = await httpJSON('/admin/set-active', { method:'POST', body: JSON.stringify({ user_id: CURRENT.id, is_active: Number(!Number(CURRENT.is_active)) }) });
+      if(!res.ok) return alert(res.data?.error || 'تعذر تحديث الحالة');
+      if(res.data?.user){ CURRENT = res.data.user; renderUserBox(CURRENT); }
+      alert('تم تحديث حالة الحساب ✅');
+    }
+
+    async function loadUserTx(uid){
+      const tb = document.querySelector('#tx-table tbody');
+      tb.innerHTML = '<tr><td class="muted" colspan="5">... تحميل</td></tr>';
+      const res = await httpJSON('/admin/user/' + encodeURIComponent(uid) + '/transactions');
+      if(!res.ok){ tb.innerHTML = '<tr><td class="muted" colspan="5">تعذر التحميل</td></tr>'; return; }
+      const items = res.data?.items || [];
+      if(items.length === 0){ tb.innerHTML = '<tr><td class="muted" colspan="5">— لا بيانات —</td></tr>'; return; }
+      tb.innerHTML = '';
+      for(const t of items){
+        let tag = 'عملية';
+        if(t.type==='transfer_in') tag='وارد';
+        else if(t.type==='transfer_out') tag='صادر';
+        else if(t.type==='topup') tag='تعبئة';
+        else if(t.type==='withdraw') tag='سحب';
+        else if(t.type==='admin_adj') tag='تعديل إداري';
+        const meta = (()=>{ try{ return JSON.parse(t.meta||'{}'); }catch{ return {}; }})();
+        const detail = meta.from ? ('من ' + (meta.from||'')) : (meta.to ? ('إلى ' + (meta.to||'')) : (meta.request_id ? ('طلب #' + meta.request_id) : ''));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="muted">${fmtDate(t.created_at)}</td>
+          <td>${tag}</td>
+          <td><b>${fmt(t.amount)}</b></td>
+          <td>${fmt(t.balance_after)}</td>
+          <td class="muted">${detail}</td>
+        `;
+        tb.appendChild(tr);
+      }
+    }
+
+    // ===== Requests Admin =====
+    async function loadRequests(){
+      const st = document.getElementById('rq-status').value;
+      const tp = document.getElementById('rq-type').value;
+      const res = await httpJSON('/admin/requests?status=' + encodeURIComponent(st) + '&type=' + encodeURIComponent(tp));
+      const tb = document.querySelector('#rq-table tbody');
+      if(!res.ok){ tb.innerHTML = '<tr><td class="muted" colspan="7">تعذر التحميل</td></tr>'; return; }
+      const items = res.data?.items || [];
+      if(items.length === 0){ tb.innerHTML = '<tr><td class="muted" colspan="7">— لا بيانات —</td></tr>'; return; }
+      tb.innerHTML = '';
+      for(const r of items){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>#${r.id}</td>
+          <td>${r.full_name}</td>
+          <td>${r.phone}</td>
+          <td>${r.type === 'topup' ? 'تعبئة' : 'سحب'}</td>
+          <td><b>${fmt(r.amount)}</b></td>
+          <td>${r.status}</td>
+          <td>
+            ${r.status==='pending'
+              ? `<button class="btn primary" data-approve="${r.id}">موافقة</button>
+                 <button class="btn danger" data-reject="${r.id}">رفض</button>`
+              : '<span class="muted">—</span>'}
+          </td>
+        `;
+        tb.appendChild(tr);
+      }
+
+      // bind approve/reject
+      tb.querySelectorAll('[data-approve]').forEach(b=>{
+        b.addEventListener('click', async ()=>{
+          const id = b.getAttribute('data-approve');
+          const note = prompt('ملاحظة (اختياري):') || '';
+          const res2 = await httpJSON('/admin/requests/' + id + '/approve', { method:'POST', body: JSON.stringify({ note }) });
+          if(!res2.ok){ alert(res2.data?.error||'فشل الموافقة'); return; }
+          loadRequests();
+          if(CURRENT) loadUserTx(CURRENT.id);
+          alert('تمت الموافقة ✅');
+        });
+      });
+      tb.querySelectorAll('[data-reject]').forEach(b=>{
+        b.addEventListener('click', async ()=>{
+          const id = b.getAttribute('data-reject');
+          const note = prompt('سبب الرفض (اختياري):') || '';
+          const res2 = await httpJSON('/admin/requests/' + id + '/reject', { method:'POST', body: JSON.stringify({ note }) });
+          if(!res2.ok){ alert(res2.data?.error||'فشل الرفض'); return; }
+          loadRequests();
+          alert('تم الرفض ❌');
+        });
+      });
+    }
+
+    // إنشاء عميل جديد
+    document.getElementById('btn-create-user').addEventListener('click', async ()=>{
+      const full_name = document.getElementById('nu_full').value.trim();
+      const phone     = document.getElementById('nu_phone').value.trim();
+      const email     = document.getElementById('nu_email').value.trim();
+      const password  = document.getElementById('nu_pass').value.trim();
+      if(!full_name || !phone || !password){ return alert('أكمل الحقول المطلوبة'); }
+      const r = await httpJSON('/admin/create-user', { method:'POST', body: JSON.stringify({ full_name, phone, email, password }) });
+      if(!r.ok){ return alert(r.data?.error || 'تعذّر الإنشاء'); }
+      alert('تم إنشاء الحساب ✅');
+      document.getElementById('nu_full').value=''; document.getElementById('nu_phone').value='';
+      document.getElementById('nu_email').value=''; document.getElementById('nu_pass').value='';
+      loadAll();
+    });
+
+    // Bindings
+    document.getElementById('btn-search').addEventListener('click', searchUsers);
+    document.getElementById('btn-load-all').addEventListener('click', loadAll);
+    document.getElementById('btn-apply').addEventListener('click', applyBalance);
+    document.getElementById('btn-toggle-active').addEventListener('click', toggleActive);
+    document.getElementById('btn-refresh-tx').addEventListener('click', ()=> CURRENT && loadUserTx(CURRENT.id));
+    document.getElementById('rq-status').addEventListener('change', loadRequests);
+    document.getElementById('rq-type').addEventListener('change', loadRequests);
+    document.getElementById('btn-load-requests').addEventListener('click', loadRequests);
+    document.getElementById('btn-logout').addEventListener('click', async ()=>{
+      await fetch('/admin/logout', { method:'POST' });
+      toLogin();
+    });
+
+    (async function init(){
+      await ensureSession();   // يظهر اسم الأدمن ويجلب CSRF
+      try{
+        const last = localStorage.getItem('last_admin_user');
+        if(last){
+          const u = JSON.parse(last);
+          addUserRow(u);
+          selectUser(u);
+        }
+      }catch(e){}
+      loadRequests();
+    })();
+  </script>
+</body>
+</html>

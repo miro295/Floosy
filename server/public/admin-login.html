@@ -1,0 +1,100 @@
+<!-- public/admin-login.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>دخول الأدمن - Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
+      --primary:#22c55e; --primary-2:#10b981; --accent:#38bdf8;
+      --border:rgba(148,163,184,.15); --shadow:0 12px 35px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    body{margin:0; min-height:100vh; display:grid; place-items:center;
+         background:linear-gradient(180deg,#0b1220 0%,#0f172a 100%); color:var(--text);
+         font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;}
+    .wrap{width:92%; max-width:520px; display:grid; gap:14px}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:16px}
+    h1{margin:0 0 6px; font-size:18px}
+    label{display:block; margin-top:8px; color:var(--muted); font-size:14px}
+    input{width:100%; padding:12px; margin-top:6px; border-radius:10px; border:1px solid var(--border); background:#0b1324; color:#e5e7eb; outline:none}
+    input:focus{ box-shadow:0 0 0 6px rgba(56,189,248,.25); border-color: var(--accent) }
+    .btn{padding:12px 14px; border-radius:12px; border:none; cursor:pointer; font-weight:800}
+    .btn.green{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#062b1a }
+    .btn.blue{ background:linear-gradient(135deg,var(--accent),#60a5fa); color:#062b1a }
+    .msg{ margin-top:10px; padding:10px; border-radius:10px; display:none; text-align:center; font-size:14px }
+    .ok{ background:#14532d; color:#bbf7d0 } .err{ background:#7f1d1d; color:#fee2e2 }
+    .muted{ color:var(--muted); font-size:12px }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>ربط هذا الجهاز (مرة واحدة)</h1>
+      <label>Bind Key (من .env)</label>
+      <input id="bind_key" placeholder="مثال: MY_SUPER_BIND_KEY">
+      <button class="btn blue" id="btn-bind" style="margin-top:10px">ربط الجهاز</button>
+      <div id="bind-msg" class="msg"></div>
+      <div class="muted" style="margin-top:8px">لو كانت الحماية معطّلة (ADMIN_DEVICE_ENFORCE=0) تقدر تتجاهل الربط.</div>
+    </div>
+
+    <div class="card">
+      <h1>تسجيل دخول الأدمن</h1>
+      <label>اسم الدخول</label>
+      <input id="ad_user" placeholder="username" autocomplete="username">
+      <label>كلمة المرور</label>
+      <input id="ad_pass" type="password" placeholder="********" autocomplete="current-password">
+      <button class="btn green" id="btn-login" style="margin-top:10px">دخول</button>
+      <div id="login-msg" class="msg"></div>
+      <div class="muted" style="margin-top:8px">بعد الدخول سيتم تحويلك للوحة الإدارة.</div>
+    </div>
+  </div>
+
+  <script>
+    async function checkAlready(){
+      try{
+        const r = await fetch('/admin/session');
+        if(r.ok){ location.href = '/admin'; }
+      }catch{}
+    }
+    checkAlready();
+
+    function show(id, text, ok){
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'msg ' + (ok?'ok':'err');
+      el.style.display = 'block';
+      setTimeout(()=> el.style.display='none', 2500);
+    }
+
+    document.getElementById('btn-bind').addEventListener('click', async ()=>{
+      const key = document.getElementById('bind_key').value.trim();
+      if(!key) return show('bind-msg','أدخل المفتاح', false);
+      try{
+        const r = await fetch('/admin/bind-device', { method:'POST', headers:{ 'x-bind-key': key }});
+        const d = await r.json();
+        if(r.ok){ show('bind-msg','تم الربط ✅', true); }
+        else { show('bind-msg', d.error || 'فشل الربط', false); }
+      }catch{ show('bind-msg','تعذّر الاتصال', false); }
+    });
+
+    document.getElementById('btn-login').addEventListener('click', async ()=>{
+      const username = document.getElementById('ad_user').value.trim();
+      const password = document.getElementById('ad_pass').value.trim();
+      if(!username || !password){ return show('login-msg','أكمل الحقول', false); }
+      try{
+        const r = await fetch('/admin/login', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const d = await r.json().catch(()=>({}));
+        if(r.ok){ location.href = '/admin'; }
+        else { show('login-msg', d.error || 'فشل الدخول', false); }
+      }catch{ show('login-msg','تعذّر الاتصال', false); }
+    });
+  </script>
+</body>
+</html>

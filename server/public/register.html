@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<title>إنشاء حساب جديد - Floosy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+:root {
+  --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
+  --primary:#22c55e; --primary-hover:#16a34a;
+  --border:rgba(148,163,184,.15); --shadow:0 12px 35px rgba(0,0,0,.35);
+}
+body {
+  margin:0; min-height:100vh; display:grid; place-items:center;
+  background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+  font-family:system-ui, sans-serif; color:var(--text);
+}
+.card {
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  box-shadow:var(--shadow); padding:24px; width:100%; max-width:420px;
+}
+h1 { text-align:center; margin-bottom:20px }
+label { display:block; margin-top:12px; font-size:14px; color:var(--muted) }
+input {
+  width:100%; padding:10px; margin-top:6px;
+  border:1px solid var(--border); border-radius:8px;
+  background:#1f2937; color:var(--text);
+}
+button {
+  width:100%; padding:12px; margin-top:18px;
+  background:var(--primary); color:#fff; border:none;
+  border-radius:8px; font-size:16px; cursor:pointer;
+}
+button:hover { background:var(--primary-hover) }
+.msg {
+  margin-top:15px; padding:10px; border-radius:8px; display:none;
+  font-size:14px; text-align:center;
+}
+.ok { background:#065f46; color:#d1fae5 }
+.err { background:#7f1d1d; color:#fee2e2 }
+.link { text-align:center; margin-top:12px; font-size:14px }
+.link a { color:var(--primary); text-decoration:none }
+.phone-container { display:flex; align-items:center; gap:5px; }
+.phone-prefix {
+  background:#1f2937; padding:10px; border-radius:8px;
+  border:1px solid var(--border); color:var(--text);
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.phone-prefix img { width:20px; height:14px; }
+.phone-input { flex:1; }
+.help { color:var(--muted); font-size:12px; margin-top:4px }
+.rule { font-size:12px; margin:3px 0; }
+.rule.green { color:#22c55e; }
+.rule.red { color:#ef4444; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>إنشاء حساب جديد</h1>
+
+  <label>الاسم الكامل</label>
+  <input id="full_name" placeholder="مثال: محمد أحمد" />
+
+  <label>رقم الهاتف (ليبيا)</label>
+  <div class="phone-container">
+    <div class="phone-prefix">
+      <img src="https://flagcdn.com/w20/ly.png" alt="LY" />
+      +218
+    </div>
+    <input id="phone" class="phone-input" placeholder="0912345678" maxlength="10" />
+  </div>
+  <div class="help">يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.</div>
+
+  <label>البريد الإلكتروني</label>
+  <input id="email" placeholder="name@example.com" />
+
+  <label>كلمة المرور</label>
+  <input id="password" type="password" placeholder="********" />
+  <div id="password-rules">
+    <p id="rule-lower" class="rule red">● حرف صغير (a-z)</p>
+    <p id="rule-upper" class="rule red">● حرف كبير (A-Z)</p>
+    <p id="rule-number" class="rule red">● رقم (0-9)</p>
+    <p id="rule-length" class="rule red">● 8 أحرف+</p>
+  </div>
+
+  <label>تأكيد كلمة المرور</label>
+  <input id="password2" type="password" placeholder="********" />
+
+  <button id="registerBtn">تسجيل</button>
+  <div id="msg" class="msg"></div>
+
+  <div class="link">
+    <a href="/login.html">عندي حساب؟ تسجيل دخول</a> | <a href="/">الصفحة الرئيسية</a>
+  </div>
+</div>
+
+<!-- Modal: تأكيد البريد -->
+<div id="verifyModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,.65);z-index:50">
+  <div style="width:92%;max-width:420px;background:#111827;border:1px solid rgba(148,163,184,.15);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,.35);padding:16px">
+    <h3 style="margin:0 0 8px;color:#e5e7eb">تأكيد البريد الإلكتروني</h3>
+    <p style="margin:0 0 10px;color:#94a3b8" id="verifyEmailHint">أدخل الكود المرسل إلى بريدك.</p>
+    <input id="v_code" placeholder="أدخل الكود (6 أرقام)" maxlength="6"
+           style="width:100%;padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:#0b1324;color:#e5e7eb;outline:none" />
+    <div id="v_msg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:14px;text-align:center"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button id="v_submit" style="flex:1;padding:10px;border:none;border-radius:10px;background:#22c55e;color:#062b1a;font-weight:700;cursor:pointer">تأكيد</button>
+      <button id="v_resend" style="padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:10px;background:#0b1324;color:#e5e7eb;cursor:pointer">إعادة إرسال</button>
+      <button id="v_close"  style="padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:10px;background:#0b1324;color:#e5e7eb;cursor:pointer">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Helpers ==========
+function show(t, err=false){
+  const m = document.getElementById('msg');
+  m.textContent = t; m.className = 'msg ' + (err ? 'err' : 'ok'); m.style.display='block';
+}
+function isLibyanPhone(p){ return /^0(91|92|93|94)\d{7}$/.test(p); }
+function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
+function isStrongPassword(p){
+  return /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p) && p.length >= 8;
+}
+
+// ========== Verify email modal ==========
+let __verifyEmail = ""; // نخزن البريد بعد التسجيل
+
+function openVerifyModal(email){
+  __verifyEmail = email || "";
+  document.getElementById('verifyEmailHint').textContent = "أدخل الكود المرسل إلى: " + (__verifyEmail || "");
+  document.getElementById('v_code').value = "";
+  document.getElementById('v_msg').style.display = 'none';
+  document.getElementById('verifyModal').style.display = 'flex';
+}
+function closeVerifyModal(){
+  document.getElementById('verifyModal').style.display = 'none';
+}
+function vshow(t, ok=false){
+  const el = document.getElementById('v_msg');
+  el.textContent = t;
+  el.style.display = 'block';
+  el.style.background = ok ? '#065f46' : '#7f1d1d';
+  el.style.color = ok ? '#d1fae5' : '#fee2e2';
+}
+
+document.getElementById('v_close').addEventListener('click', closeVerifyModal);
+document.getElementById('v_submit').addEventListener('click', async function(){
+  const code = document.getElementById('v_code').value.trim();
+  if (!code || !/^\d{4,6}$/.test(code)){ vshow('أدخل كود صحيح'); return; }
+  try{
+    const r = await fetch('/verify-email', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: __verifyEmail, code })
+    });
+    const data = await r.json();
+    if(r.ok){
+      vshow('تم تأكيد البريد بنجاح ✅', true);
+
+      // خزّن التوكن والبيانات لو رجعها السيرفر
+      if (data.token) localStorage.setItem('floosy_token', data.token);
+      if (data?.user?.phone) localStorage.setItem('floosy_phone', data.user.phone);
+
+      // ادخل مباشرة للداشبورد
+      setTimeout(()=>{
+if (data.set_pin) {
+    window.location.href = "/create-pin.html";
+} else {
+    window.location.href = "/dashboard.html";
+}
+      }, 600);
+
+    } else {
+      vshow(data.error || 'فشل التأكيد', false);
+    }
+  }catch{
+    vshow('تعذّر الاتصال بالسيرفر');
+  }
+});
+
+document.getElementById('v_resend').addEventListener('click', async function(){
+  if(!__verifyEmail){ vshow('بريد غير معروف'); return; }
+  try{
+    const r = await fetch('/resend-verify', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: __verifyEmail })
+    });
+    const data = await r.json();
+    if(r.ok){ vshow('تم إرسال كود جديد ✉️', true); }
+    else   { vshow(data.error || 'تعذّر الإرسال'); }
+  }catch{
+    vshow('تعذّر الاتصال بالسيرفر');
+  }
+});
+
+// ========== Password rules live ==========
+document.getElementById('password').addEventListener('input', function(){
+  const pass = this.value;
+  document.getElementById('rule-lower').className = /[a-z]/.test(pass) ? 'rule green' : 'rule red';
+  document.getElementById('rule-upper').className = /[A-Z]/.test(pass) ? 'rule green' : 'rule red';
+  document.getElementById('rule-number').className = /\d/.test(pass) ? 'rule green' : 'rule red';
+  document.getElementById('rule-length').className = pass.length >= 8 ? 'rule green' : 'rule red';
+});
+
+// ========== Register submit ==========
+document.getElementById('registerBtn').addEventListener('click', async function(){
+  const full_name = document.getElementById('full_name').value.trim();
+  const phone     = document.getElementById('phone').value.trim();
+  const email     = document.getElementById('email').value.trim();
+  const password  = document.getElementById('password').value.trim();
+  const password2 = document.getElementById('password2').value.trim();
+  document.getElementById('msg').style.display='none';
+
+  if (!full_name){ show('أدخل الاسم الكامل', true); return; }
+  if (!isLibyanPhone(phone)){
+    show('رقم الهاتف غير صحيح. يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.', true); return;
+  }
+  if (!email || !isValidEmail(email)){
+    show('البريد الإلكتروني غير صالح.', true); return;
+  }
+  if (!password || !password2){ show('أدخل كلمة المرور وتأكيدها.', true); return; }
+  if (password !== password2){ show('كلمتا المرور غير متطابقتين.', true); return; }
+  if (!isStrongPassword(password)){
+    show('كلمة المرور ضعيفة. يجب أن تحتوي على حرف صغير، حرف كبير، رقم، وطول لا يقل عن 8.', true); return;
+  }
+
+  try {
+    const r = await fetch('/register', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ full_name, phone, email, password })
+    });
+    const data = await r.json();
+    if (r.ok){
+      if (data.token) localStorage.setItem('floosy_token', data.token);
+      localStorage.setItem('floosy_phone', data.user.phone);
+      show('✅ تم إنشاء الحساب. تم إرسال كود إلى بريدك لتأكيده.');
+      openVerifyModal(email); // افتح مودال التأكيد
+    } else {
+      show('❌ ' + (data.error || 'حدث خطأ'), true);
+    }
+  } catch {
+    show('⚠ تعذّر الاتصال بالسيرفر', true);
+  }
+});
+</script>
+
+</body>
+</html>

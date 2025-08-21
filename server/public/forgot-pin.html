@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>نسيت الـPIN - Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f172a; --card:#111827; --text:#e5e7eb; --primary:#22c55e;
+      --muted:#94a3b8; --border:rgba(148,163,184,.15); --primary-hover:#16a34a;
+    }
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#0b1220,#0f172a);
+         color:var(--text);font-family:system-ui,sans-serif;display:grid;place-items:center;padding:20px}
+    .box{background:var(--card);border:1px solid var(--border);padding:24px;border-radius:16px;
+         box-shadow:0 12px 35px rgba(0,0,0,.35);width:100%;max-width:420px;text-align:center}
+    h1{margin:0 0 18px}
+    label{display:block;margin-top:12px;font-size:14px;color:var(--muted);text-align:right}
+    input[type="email"]{
+      width:100%;padding:10px;margin-top:6px;border:1px solid var(--border);border-radius:10px;
+      background:#0b1324;color:var(--text);outline:none
+    }
+    button{
+      width:100%;padding:12px;margin-top:14px;background:var(--primary);color:#062b1a;font-weight:700;
+      border:none;border-radius:10px;cursor:pointer
+    }
+    button[disabled]{opacity:.65;cursor:not-allowed}
+    button:hover{background:var(--primary-hover)}
+    .muted{color:var(--muted);font-size:13px;margin-top:6px}
+    .msg{margin-top:12px;display:none;border-radius:8px;padding:10px;text-align:center;font-size:14px}
+    .msg.ok{background:#065f46;color:#d1fae5}
+    .msg.err{background:#7f1d1d;color:#fee2e2}
+    .sep{height:1px;background:var(--border);margin:16px 0}
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <img src="/logo.png" alt="Floosy" style="width:64px;margin-bottom:12px"/>
+  <h1>نسيت الـPIN؟</h1>
+
+  <!-- Step 1 -->
+  <div id="step-email">
+    <label>أدخل بريدك الإلكتروني</label>
+    <input id="email" type="email" placeholder="name@example.com" autocomplete="email" />
+    <button id="sendBtn">إرسال كود التحقق</button>
+    <div id="msg1" class="msg"></div>
+    <div class="muted">سيصلك كود من 6 أرقام لإعادة تعيين الـPIN.</div>
+  </div>
+
+  <div class="sep"></div>
+
+<!-- Step 2 -->
+<div id="step-otp" style="display:none">
+  <p class="muted">تم إرسال الكود إلى: <span id="maskedEmail"></span></p>
+
+  <!-- حقل واحد للكود -->
+  <input id="otpInput" type="text" inputmode="numeric" pattern="\d*" maxlength="6"
+         style="direction:ltr;letter-spacing:8px;width:100%;height:48px;font-size:30px;
+                border:1px solid rgba(148,163,184,.25);border-radius:10px;
+                background:#0b1324;color:#e5e7eb;text-align:center;margin:12px 0 8px" />
+
+  <button id="verifyBtn">تأكيد الكود</button>
+  <button id="resendBtn" style="margin-top:8px;background:#0b1324;color:var(--text);border:1px solid var(--border)">
+    إعادة إرسال (<span id="resendLeft">60</span>s)
+  </button>
+  <div id="msg2" class="msg"></div>
+</div>
+
+</div>
+
+<script>
+  const $=s=>document.querySelector(s);
+  const validEmail=e=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e||'').trim());
+
+  function maskEmail(e){
+    e=String(e||''); const at=e.indexOf('@');
+    if(at<=2) return e;
+    return e.slice(0,3)+'…'+e.slice(at);
+  }
+  function banner(el, text, ok=false){
+    el.textContent=text;
+    el.className='msg '+(ok?'ok':'err');
+    el.style.display='block';
+  }
+  function countdown(sec, onTick, onDone){
+    let left=sec; onTick(left);
+    const id=setInterval(()=>{ left--; onTick(left); if(left<=0){ clearInterval(id); onDone&&onDone(); } },1000);
+    return ()=>clearInterval(id);
+  }
+  function getOtp(){ return (document.getElementById('otpInput').value || '').trim(); }
+
+  let currentEmail='', stopTimer=null, lock=false;
+
+  async function sendOtp(email){
+    try{
+      const r=await fetch('/forgot-pin/send-otp',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email})
+      });
+      return await r.json();
+    }catch{ return { error:'تعذّر الاتصال' }; }
+  }
+
+  document.getElementById('sendBtn').onclick=async ()=>{
+    const email=($('#email').value||'').trim().toLowerCase();
+    const msg1=$('#msg1'); msg1.style.display='none';
+    if(!validEmail(email)){ banner(msg1,'بريد غير صالح'); return; }
+
+    $('#sendBtn').disabled=true;
+    const r=await sendOtp(email);
+    $('#sendBtn').disabled=false;
+
+    if(r.ok){
+      currentEmail=email;
+      $('#maskedEmail').textContent=maskEmail(currentEmail);
+      $('#step-email').style.display='none';
+      $('#step-otp').style.display='';
+      document.getElementById('step-otp').scrollIntoView({ behavior:'smooth' });
+      document.getElementById('otpInput').focus();
+
+      // عدّاد 60 ثانية
+      $('#resendBtn').disabled=true; lock=true;
+      stopTimer && stopTimer();
+      stopTimer = countdown(60, n=> $('#resendLeft').textContent=n, ()=>{
+        $('#resendBtn').disabled=false; lock=false; $('#resendLeft').textContent='0';
+      });
+
+      banner($('#msg2'),'تم إرسال الكود ✉️', true);
+    }else{
+      banner(msg1, r.error||'خطأ بالإرسال');
+    }
+  };
+
+  // كتابة أرقام فقط + إرسال تلقائي عند 6
+  const otpInputEl = document.getElementById('otpInput');
+  otpInputEl.addEventListener('input', ()=>{
+    otpInputEl.value = otpInputEl.value.replace(/\D/g,'').slice(0,6);
+    if(otpInputEl.value.length===6) document.getElementById('verifyBtn').click();
+  });
+
+  document.getElementById('resendBtn').onclick=()=>{ if(!lock) document.getElementById('sendBtn').click(); };
+
+  document.getElementById('verifyBtn').onclick=async()=>{
+    const otp=getOtp(); const msg2=$('#msg2'); msg2.style.display='none';
+    if(!/^\d{6}$/.test(otp)){ banner(msg2,'أدخل 6 أرقام صحيحة'); return; }
+
+    $('#verifyBtn').disabled=true;
+    let r;
+    try{
+      const res=await fetch('/forgot-pin/verify-otp',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ email:currentEmail, otp })
+      });
+      r=await res.json();
+    }catch{ r={ error:'تعذّر الاتصال' }; }
+    $('#verifyBtn').disabled=false;
+
+    if(r.ok){
+      banner(msg2,'✅ تم التحقق — جارٍ التحويل...', true);
+      setTimeout(()=>{ location.href='/create-pin.html?email='+encodeURIComponent(currentEmail); }, 1200);
+    }else{
+      banner(msg2, r.error||'الكود غير صحيح');
+    }
+  };
+
+  // Enter = متابعة
+  document.addEventListener('keydown',(e)=>{
+    if(e.key==='Enter'){
+      if($('#step-email').style.display!=='none') $('#sendBtn').click();
+      else $('#verifyBtn').click();
+    }
+  });
+</script>
+</body>
+</html>

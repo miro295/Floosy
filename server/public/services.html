@@ -1,0 +1,174 @@
+<!-- public/services.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>الخدمات — Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b1220; --card:#0f172a; --ink:#e5e7eb; --muted:#94a3b8;
+      --border:rgba(148,163,184,.16); --shadow:0 12px 35px rgba(0,0,0,.35);
+      --accent:#38bdf8; --green:#22c55e; --green-2:#10b981; --blue:#3b82f6;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; display:grid; place-items:start center;
+      background: radial-gradient(900px 500px at 110% -20%, rgba(56,189,248,.14), transparent 60%),
+                  radial-gradient(900px 500px at -20% 120%, rgba(34,197,94,.14), transparent 60%),
+                  linear-gradient(180deg,var(--bg) 0%, #0f172a 100%);
+      color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      padding:28px 20px;
+    }
+    .wrap{ width:100%; max-width:920px }
+    .panel{ background:var(--card); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); padding:18px; }
+    .head{ text-align:center; margin-bottom:16px }
+    .head h1{ margin:0 0 6px; font-size:24px; letter-spacing:.2px }
+    .head .sub{ color:var(--muted); font-size:13px }
+
+    /* Grid sections */
+    .grid2{ display:grid; gap:14px; grid-template-columns: 1fr 1fr }
+    @media(max-width:760px){ .grid2{ grid-template-columns:1fr } }
+
+    /* Cards tidy */
+    .card{ background:#0b1324; border:1px solid var(--border); border-radius:14px; padding:14px }
+    .card h3{ margin:0 0 8px; font-size:16px }
+    label{ display:block; margin-top:8px; color:var(--muted); font-size:13px }
+    input{
+      width:100%; padding:12px; margin-top:6px; border-radius:10px;
+      border:1px solid var(--border); background:#0d162a; color:var(--ink); outline:none;
+    }
+    input:focus{ box-shadow:0 0 0 6px rgba(56,189,248,.18); border-color: var(--accent) }
+
+    /* Buttons */
+    .btn{ width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+          background:#0d162a; color:var(--ink); cursor:pointer; font-weight:700 }
+    .btn:hover{ border-color:#334155 }
+    .btn.green{ background:linear-gradient(135deg, var(--green), var(--green-2)); border:none; color:#062b1a }
+    .btn.blue{ background:linear-gradient(135deg, var(--blue), #60a5fa); border:none; color:#0b1220 }
+    .btn.ghost{ background:rgba(148,163,184,.08) }
+
+    /* Messages */
+    .msg{ margin-top:10px; padding:10px; border-radius:10px; text-align:center; font-size:13px; display:none }
+    .ok{ background:#14532d; color:#bbf7d0 }
+    .err{ background:#7f1d1d; color:#fee2e2 }
+
+    
+    /* Table */
+    table{ width:100%; border-collapse:collapse; margin-top:10px; background:#0b1324; border:1px solid var(--border); border-radius:12px; overflow:hidden }
+    th,td{ border-bottom:1px solid var(--border); padding:10px; text-align:right; font-size:14px }
+    th{ color:#cbd5e1; background:#0e1628 }
+    tr:last-child td{ border-bottom:none }
+
+    .muted{ color:var(--muted); font-size:12px }
+    .latin{ direction:ltr; unicode-bidi:bidi-override; font-variant-numeric: tabular-nums }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <div class="head">
+        <h1>الخدمات (بموافقة الإدارة)</h1>
+        <div class="sub">قدّم طلب تعبئة أو سحب. ستصلك نتيجة المراجعة في التاريخ أدناه.</div>
+      </div>
+
+      <!-- Top: Topup / Withdraw -->
+      <div class="grid2">
+        <div class="card">
+          <h3>طلب تعبئة</h3>
+          <label>المبلغ (LYD)</label>
+          <input id="topup-amount" class="latin" type="number" placeholder="مثال: 150">
+          <button class="btn green" id="btn-topup" style="margin-top:10px">إرسال طلب تعبئة</button>
+          <div id="msg-topup" class="msg"></div>
+        </div>
+
+        <div class="card">
+          <h3>طلب سحب</h3>
+          <label>المبلغ (LYD)</label>
+          <input id="withdraw-amount" class="latin" type="number" placeholder="مثال: 100">
+          <button class="btn blue" id="btn-withdraw" style="margin-top:10px">إرسال طلب سحب</button>
+          <div id="msg-withdraw" class="msg"></div>
+        </div>
+      </div>
+
+      
+      <!-- Bottom: History -->
+      <div class="card" style="margin-top:16px">
+        <h3 style="margin-bottom:6px">طلباتي الأخيرة</h3>
+        <table>
+          <thead><tr><th>#</th><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+          <tbody id="rq-body"><tr><td class="muted" colspan="5">— لا بيانات —</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // حجب الصفحة للي مو مسجل
+    const token = localStorage.getItem('floosy_token');
+    if(!token){ alert('يلزم تسجيل الدخول'); location.href='/login.html'; }
+
+    // رسائل
+    function showMsg(id, text, ok){
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'msg ' + (ok ? 'ok' : 'err');
+      el.style.display = 'block';
+      setTimeout(()=> el.style.display='none', 2600);
+    }
+
+    // طلب (تعبئة/سحب)
+    async function postRequest(type, amount){
+      const r = await fetch('/request', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+        body: JSON.stringify({ type, amount: Number(amount) })
+      });
+      let d={}; try{ d = await r.json(); }catch{}
+      return { ok:r.ok, data:d };
+    }
+
+    // أزرار التعبئة/السحب
+    document.getElementById('btn-topup').addEventListener('click', async ()=>{
+      const amt = Number(document.getElementById('topup-amount').value);
+      if(!Number.isFinite(amt) || amt<=0) return showMsg('msg-topup','أدخل مبلغ صحيح',false);
+      const { ok, data } = await postRequest('topup', amt);
+      if(ok){ showMsg('msg-topup','تم إنشاء الطلب ✅', true); document.getElementById('topup-amount').value=''; loadMine(); }
+      else { showMsg('msg-topup', data.error || 'فشل إنشاء الطلب', false); }
+    });
+
+    document.getElementById('btn-withdraw').addEventListener('click', async ()=>{
+      const amt = Number(document.getElementById('withdraw-amount').value);
+      if(!Number.isFinite(amt) || amt<=0) return showMsg('msg-withdraw','أدخل مبلغ صحيح',false);
+      const { ok, data } = await postRequest('withdraw', amt);
+      if(ok){ showMsg('msg-withdraw','تم إنشاء الطلب ✅', true); document.getElementById('withdraw-amount').value=''; loadMine(); }
+      else { showMsg('msg-withdraw', data.error || 'فشل إنشاء الطلب', false); }
+    });
+
+
+    // تحميل الطلبات
+    async function loadMine(){
+      try{
+        const r = await fetch('/my-requests', { headers:{ 'Authorization':'Bearer '+token }});
+        if(!r.ok) return;
+        const d = await r.json();
+        const tb = document.getElementById('rq-body');
+        const items = d.items || [];
+        if(items.length===0){ tb.innerHTML = '<tr><td class="muted" colspan="5">— لا بيانات —</td></tr>'; return; }
+        tb.innerHTML = '';
+        for(const x of items){
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>#${x.id}</td>
+            <td>${x.type==='topup'?'تعبئة':'سحب'}</td>
+            <td class="latin"><b>${Number(x.amount).toFixed(2)}</b></td>
+            <td>${x.status}</td>
+            <td>${(x.created_at||'').toString().slice(0,19)}</td>`;
+          tb.appendChild(tr);
+        }
+      }catch{}
+    }
+    loadMine();
+  </script>
+</body>
+</html>

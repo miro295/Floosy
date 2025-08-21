@@ -1,0 +1,47 @@
+<!-- public/contact.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تواصل معنا — Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{ --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --primary:#22c55e; --border:rgba(148,163,184,.15) }
+    body{ margin:0; min-height:100vh; display:grid; place-items:center; background:linear-gradient(180deg,#0b1220,#0f172a); color:var(--text); font-family:system-ui,sans-serif; padding:24px }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; width:100%; max-width:560px }
+    label{ display:block; margin-top:10px; color:var(--muted); font-size:14px }
+    input,textarea{ width:100%; padding:10px; margin-top:6px; border:1px solid var(--border); border-radius:10px; background:#0b1324; color:var(--text) }
+    .btn{ margin-top:12px; padding:12px 14px; border-radius:10px; border:none; background:linear-gradient(135deg,var(--primary),#10b981); color:#062b1a; font-weight:800; cursor:pointer }
+    .msg{ margin-top:10px; padding:10px; border-radius:10px; display:none; text-align:center; font-size:14px }
+    .ok{ background:#14532d; color:#bbf7d0 } .err{ background:#7f1d1d; color:#fee2e2 }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 style="margin:0 0 8px">تواصل معنا</h1>
+    <label>الاسم</label>
+    <input id="name" placeholder="اسمك الكامل">
+    <label>البريد</label>
+    <input id="email" placeholder="name@example.com">
+    <label>الرسالة</label>
+    <textarea id="message" rows="5" placeholder="كيف نقدر نساعدك؟"></textarea>
+    <button class="btn" id="send">إرسال</button>
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <script>
+    function show(t, ok){ const m=document.getElementById('msg'); m.textContent=t; m.className='msg '+(ok?'ok':'err'); m.style.display='block'; }
+    document.getElementById('send').addEventListener('click', async ()=>{
+      const name = document.getElementById('name').value.trim();
+      const email= document.getElementById('email').value.trim();
+      const message = document.getElementById('message').value.trim();
+      try{
+        const r = await fetch('/contact',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name,email,message })});
+        const d = await r.json();
+        if(r.ok){ show('تم الإرسال ✅ سنعاودك قريبًا', true); document.getElementById('name').value=''; document.getElementById('email').value=''; document.getElementById('message').value=''; }
+        else { show(d.error||'تعذر الإرسال', false); }
+      }catch{ show('تعذر الاتصال بالسيرفر', false); }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل الدخول - Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
+      --primary:#22c55e; --primary-hover:#16a34a;
+      --border:rgba(148,163,184,.15); --shadow:0 12px 35px rgba(0,0,0,.35);
+    }
+    body {
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      font-family:system-ui, sans-serif;
+      color:var(--text);
+    }
+    .card {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+      padding:24px;
+      width:100%;
+      max-width:420px;
+    }
+    h1 {
+      text-align:center;
+      margin-bottom:20px;
+    }
+    label {
+      display:block;
+      margin-top:12px;
+      font-size:14px;
+      color:var(--muted);
+    }
+    input {
+      width:100%;
+      padding:10px;
+      margin-top:6px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:#1f2937;
+      color:var(--text);
+    }
+    button {
+      width:100%;
+      padding:12px;
+      margin-top:18px;
+      background:var(--primary);
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      font-size:16px;
+      cursor:pointer;
+    }
+    button:hover { background:var(--primary-hover); }
+    .msg {
+      margin-top:15px;
+      padding:10px;
+      border-radius:8px;
+      display:none;
+      font-size:14px;
+      text-align:center;
+    }
+    .ok  { background:#065f46; color:#d1fae5; }
+    .err { background:#7f1d1d; color:#fee2e2; }
+    .link {
+      text-align:center;
+      margin-top:12px;
+      font-size:14px;
+    }
+    .link a {
+      color:var(--primary);
+      text-decoration:none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>تسجيل الدخول</h1>
+
+  <label>البريد الاكتروني</label>
+  <input id="email" type="email" placeholder="name@example.com"/>
+
+
+  <label>كلمة المرور</label>
+  <input id="password" type="password" placeholder="******" />
+
+  <button id="loginBtn">دخول</button>
+  <div id="msg" class="msg"></div>
+
+  <div class="link">
+    <a href="/register.html">إنشاء حساب جديد</a> | <a id="forgotLink" href="/forgot-password.html">نسيت كلمة السر؟</a>
+  </div>
+</div>
+
+<script>
+function showMessage(text, isError=false){
+  const m = document.getElementById('msg');
+  m.textContent = text;
+  m.className = 'msg ' + (isError ? 'err' : 'ok');
+  m.style.display = 'block';
+}
+
+async function doLogin(){
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
+  document.getElementById('msg').style.display = 'none';
+
+  // Validation
+  if (!email || !password){
+    return showMessage('أدخل البريد الإلكتروني وكلمة المرور', true);
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    return showMessage('البريد الإلكتروني غير صالح', true);
+  }
+
+  // send to backend
+  try {
+    const r = await fetch('/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password })
+    });
+    const data = await r.json();
+
+    if (r.ok){
+      if (data.token) localStorage.setItem('floosy_token', data.token);
+      localStorage.setItem('floosy_email', data.user.email);
+      window.location.href = "/login-pin.html";
+    } else {
+      showMessage(data.error || '❌ خطأ في الدخول', true);
+    }
+  } catch {
+    showMessage('⚠ تعذّر الاتصال بالسيرفر', true);
+  }
+}
+
+document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.addEventListener('keydown', e=>{ if(e.key === 'Enter') doLogin(); });
+</script>
+
+
+</body>
+</html>
