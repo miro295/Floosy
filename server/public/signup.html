@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<title>إنشاء حساب - Floosy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+:root {
+  --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
+  --primary:#22c55e; --primary-hover:#16a34a;
+  --border:rgba(148,163,184,.15); --shadow:0 12px 35px rgba(0,0,0,.35);
+}
+body {
+  margin:0; min-height:100vh; display:grid; place-items:center;
+  background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+  font-family:system-ui, sans-serif; color:var(--text);
+}
+.card {
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  box-shadow:var(--shadow); padding:24px; width:100%; max-width:420px;
+}
+.progress {
+  height:6px; background:var(--border); border-radius:4px; overflow:hidden; margin-bottom:16px;
+}
+.progress-bar { height:100%; background:var(--primary); width:0%; transition:width .2s; }
+.progress-text { text-align:center; font-size:14px; color:var(--muted); margin:8px 0 16px; }
+label { display:block; margin-top:12px; font-size:14px; color:var(--muted) }
+input {
+  width:100%; padding:10px; margin-top:6px;
+  border:1px solid var(--border); border-radius:8px;
+  background:#1f2937; color:var(--text);
+}
+button {
+  width:100%; padding:12px; margin-top:18px;
+  background:var(--primary); color:#fff; border:none;
+  border-radius:8px; font-size:16px; cursor:pointer;
+}
+button:hover { background:var(--primary-hover) }
+button:disabled { opacity:.5; cursor:not-allowed }
+.nav { display:flex; gap:10px; }
+.nav button { flex:1; margin-top:18px; }
+.msg {
+  margin-top:15px; padding:10px; border-radius:8px; display:none;
+  font-size:14px; text-align:center;
+}
+.ok { background:#065f46; color:#d1fae5 }
+.err { background:#7f1d1d; color:#fee2e2 }
+.phone-container { display:flex; align-items:center; gap:5px; }
+.phone-prefix {
+  background:#1f2937; padding:10px; border-radius:8px;
+  border:1px solid var(--border); color:var(--text);
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.phone-prefix img { width:20px; height:14px; }
+.phone-input { flex:1; }
+.help { color:var(--muted); font-size:12px; margin-top:4px }
+.rule { font-size:12px; margin:3px 0; }
+.rule.green { color:#22c55e; }
+.rule.red { color:#ef4444; }
+.step { display:none; }
+.step.active { display:block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="progress"><div id="progressBar" class="progress-bar"></div></div>
+  <div id="progressText" class="progress-text">1/6</div>
+
+  <div id="step1" class="step active">
+    <label>الاسم الأول</label>
+    <input id="first_name" placeholder="First Name" />
+    <label>الاسم الأخير</label>
+    <input id="last_name" placeholder="Last Name" />
+    <button class="next" id="next1" disabled>التالي</button>
+  </div>
+
+  <div id="step2" class="step">
+    <label>رقم الهاتف (ليبيا)</label>
+    <div class="phone-container">
+      <div class="phone-prefix">
+        <img src="https://flagcdn.com/w20/ly.png" alt="LY" />
+        +218
+      </div>
+      <input id="phone" class="phone-input" placeholder="0912345678" maxlength="10" />
+    </div>
+    <div class="help">يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.</div>
+    <div class="nav">
+      <button type="button" class="back">رجوع</button>
+      <button type="button" class="next" id="next2" disabled>التالي</button>
+    </div>
+  </div>
+
+  <div id="step3" class="step">
+    <label>البريد الإلكتروني</label>
+    <input id="email" placeholder="name@example.com" />
+    <div class="nav">
+      <button type="button" class="back">رجوع</button>
+      <button type="button" class="next" id="next3" disabled>التالي</button>
+    </div>
+  </div>
+
+  <div id="step4" class="step">
+    <label>كلمة المرور</label>
+    <input id="password" type="password" placeholder="********" />
+    <div id="password-rules">
+      <p id="rule-lower" class="rule red">● حرف صغير (a-z)</p>
+      <p id="rule-upper" class="rule red">● حرف كبير (A-Z)</p>
+      <p id="rule-number" class="rule red">● رقم (0-9)</p>
+      <p id="rule-length" class="rule red">● 8 أحرف+</p>
+    </div>
+    <label>تأكيد كلمة المرور</label>
+    <input id="password2" type="password" placeholder="********" />
+    <div class="nav">
+      <button type="button" class="back">رجوع</button>
+      <button type="button" class="next" id="next4" disabled>التالي</button>
+    </div>
+  </div>
+
+  <div id="step5" class="step">
+    <button type="button" id="sendCodeBtn">إرسال الكود إلى البريد</button>
+    <label style="margin-top:18px">أدخل الكود المكوّن من 6 أرقام</label>
+    <input id="otp" inputmode="numeric" pattern="\d*" maxlength="6" placeholder="123456" style="direction:ltr;text-align:center" />
+    <div class="nav">
+      <button type="button" class="back">رجوع</button>
+      <button type="button" class="next" id="next5" disabled>التالي</button>
+    </div>
+  </div>
+
+  <div id="step6" class="step">
+    <label>إنشاء رمز PIN (6 أرقام)</label>
+    <input id="pin1" maxlength="6" placeholder="123456" />
+    <label>تأكيد الرمز</label>
+    <input id="pin2" type="password" maxlength="6" placeholder="******" />
+    <div class="nav">
+      <button type="button" class="back">رجوع</button>
+      <button type="button" id="finishBtn" disabled>إنهاء</button>
+    </div>
+  </div>
+
+  <div id="msg" class="msg"></div>
+</div>
+<script>
+const steps = Array.from(document.querySelectorAll('.step'));
+let current = 0;
+const data = {};
+const msg = document.getElementById('msg');
+
+function show(step){
+  steps.forEach((s,i)=> s.classList.toggle('active', i===step));
+  document.getElementById('progressBar').style.width = ((step+1)/6*100)+"%";
+  document.getElementById('progressText').textContent = `${step+1}/6`;
+  msg.style.display='none';
+}
+
+function isLibyanPhone(p){ return /^0(91|92|93|94)\d{7}$/.test(p); }
+function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
+function isStrongPassword(p){
+  return /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p) && p.length >= 8;
+}
+
+function validate(){
+  switch(current){
+    case 0:
+      return first_name.value.trim() && last_name.value.trim();
+    case 1:
+      return isLibyanPhone(phone.value.trim());
+    case 2:
+      return isValidEmail(email.value.trim());
+    case 3:
+      return isStrongPassword(password.value) && password.value===password2.value;
+    case 4:
+      return /^\d{6}$/.test(otp.value.trim());
+    case 5:
+      return /^\d{6}$/.test(pin1.value.trim()) && pin1.value===pin2.value;
+    default:
+      return false;
+  }
+}
+
+function update(){
+  const valid = validate();
+  const nextBtn = steps[current].querySelector('.next') || document.getElementById('finishBtn');
+  if(nextBtn) nextBtn.disabled = !valid;
+}
+
+steps.forEach(s=>{
+  s.querySelectorAll('input').forEach(inp=> inp.addEventListener('input', ()=>{ if(current===3 && inp.id==='password'){ updateRules(); } update(); }));
+});
+
+document.querySelectorAll('.next').forEach(btn=> btn.addEventListener('click', next));
+document.querySelectorAll('.back').forEach(btn=> btn.addEventListener('click', ()=>{ current--; show(current); update(); }));
+document.getElementById('finishBtn').addEventListener('click', finish);
+document.getElementById('sendCodeBtn').addEventListener('click', sendCode);
+
+function showMsg(t, err=false){
+  msg.textContent = t; msg.className = 'msg ' + (err ? 'err' : 'ok'); msg.style.display='block';
+}
+
+async function next(){
+  if(!validate()) return;
+  msg.style.display='none';
+  if(current===3){
+    // register
+    const full_name = first_name.value.trim()+" "+last_name.value.trim();
+    const phoneVal = phone.value.trim();
+    const emailVal = email.value.trim();
+    const passVal = password.value.trim();
+    try{
+      const r = await fetch('/register',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ full_name, phone: phoneVal, email: emailVal, password: passVal })
+      });
+      const d = await r.json();
+      if(!r.ok){ throw new Error(d.error||'حدث خطأ'); }
+      if(d.token) localStorage.setItem('floosy_token', d.token);
+      if(d?.user?.phone) localStorage.setItem('floosy_phone', d.user.phone);
+      localStorage.setItem('signup_email', emailVal);
+      data.email = emailVal;
+    }catch(e){ showMsg(e.message||'فشل التسجيل', true); return; }
+  }
+  if(current===4){
+    try{
+      const r = await fetch('/verify-email',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email: data.email, code: otp.value.trim() })
+      });
+      const d = await r.json();
+      if(!r.ok){ throw new Error(d.error||'فشل التحقق'); }
+      if(d.token) localStorage.setItem('floosy_token', d.token);
+      if(d?.user?.phone) localStorage.setItem('floosy_phone', d.user.phone);
+      if(!d.set_pin){ window.location.href='/dashboard.html'; return; }
+    }catch(e){ showMsg(e.message||'فشل التحقق', true); return; }
+  }
+  current++;
+  show(current);
+  update();
+}
+
+function updateRules(){
+  const pass = password.value;
+  document.getElementById('rule-lower').className = /[a-z]/.test(pass) ? 'rule green' : 'rule red';
+  document.getElementById('rule-upper').className = /[A-Z]/.test(pass) ? 'rule green' : 'rule red';
+  document.getElementById('rule-number').className = /\d/.test(pass) ? 'rule green' : 'rule red';
+  document.getElementById('rule-length').className = pass.length >= 8 ? 'rule green' : 'rule red';
+}
+
+async function sendCode(){
+  if(!data.email){ showMsg('البريد غير معروف', true); return; }
+  try{
+    const r = await fetch('/resend-verify',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: data.email })
+    });
+    const d = await r.json();
+    if(!r.ok){ throw new Error(d.error||'تعذّر الإرسال'); }
+    showMsg('تم إرسال الكود', false);
+  }catch(e){ showMsg(e.message||'تعذّر الإرسال', true); }
+}
+
+function getCookie(name){
+  return (document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)')||[])[2];
+}
+
+async function finish(){
+  if(!validate()) return;
+  try{
+    const r = await fetch('/set-pin',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CSRF-Token': getCookie('csrf_token')
+      },
+      body: JSON.stringify({ pin: pin1.value.trim() })
+    });
+    const d = await r.json();
+    if(!r.ok || !d.ok){ throw new Error(d.error||'فشل الحفظ'); }
+    showMsg('تم الحفظ بنجاح، جاري التحويل...', false);
+    setTimeout(()=> window.location.href='/dashboard.html', 1500);
+  }catch(e){ showMsg(e.message||'فشل الحفظ', true); }
+}
+
+show(0);
+update();
+</script>
+</body>
+</html>
