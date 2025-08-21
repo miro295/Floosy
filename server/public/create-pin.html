@@ -6,8 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{ --bg:#0f172a; --card:#111827; --text:#e5e7eb; --primary:#22c55e; --muted:#94a3b8; --border:rgba(148,163,184,.15);}    
-    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#0b1220,#0f172a);color:var(--text);font-family:system-ui,sans-serif;display:grid;place-items:center;padding:20px}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#22c55e,#3b82f6);color:var(--text);font-family:system-ui,sans-serif;display:grid;place-items:center;padding:20px}
     .box{background:var(--card);border:1px solid var(--border);padding:24px;border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,.35);width:100%;max-width:420px;text-align:center}
+    .progress{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+    .progress-bar{flex:1;height:6px;background:#1f2937;border-radius:3px;overflow:hidden}
+    .progress-bar-inner{height:100%;background:linear-gradient(90deg,#22c55e,#3b82f6);width:100%}
+    .progress-text{font-size:14px;color:var(--muted)}
+
     h1{margin:0 0 18px}
     .inputs{display:flex;justify-content:center;gap:8px;margin-bottom:20px}
     .inputs input{width:42px;height:48px;font-size:28px;text-align:center;border:1px solid var(--border);border-radius:10px;background:#0b1324;color:var(--text)}
@@ -69,6 +74,7 @@ document.getElementById("saveBtn").addEventListener("click", async function(){
 </script>
 
 <div class="box">
+  <div class="progress"><div class="progress-text">5/5</div><div class="progress-bar"><div class="progress-bar-inner"></div></div></div>
   <img src="/logo.png" alt="Floosy" style="width:64px;margin-bottom:12px"/>
   <h1>إنشاء رمز PIN</h1>
   <p style="color:var(--muted);margin-top:-10px;margin-bottom:20px">أدخل رمز من 6 أرقام</p>
