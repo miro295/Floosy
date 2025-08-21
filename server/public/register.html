@@ -33,12 +33,9 @@ button {
   border-radius:8px; font-size:16px; cursor:pointer;
 }
 button:hover { background:var(--primary-hover) }
-.msg {
-  margin-top:15px; padding:10px; border-radius:8px; display:none;
-  font-size:14px; text-align:center;
-}
-.ok { background:#065f46; color:#d1fae5 }
-.err { background:#7f1d1d; color:#fee2e2 }
+button:disabled{ opacity:.5; cursor:not-allowed }
+button.secondary{ background:#1f2937; border:1px solid var(--border); color:var(--text); }
+button.secondary:hover{ background:#374151 }
 .link { text-align:center; margin-top:12px; font-size:14px }
 .link a { color:var(--primary); text-decoration:none }
 .phone-container { display:flex; align-items:center; gap:5px; }
@@ -53,109 +50,144 @@ button:hover { background:var(--primary-hover) }
 .rule { font-size:12px; margin:3px 0; }
 .rule.green { color:#22c55e; }
 .rule.red { color:#ef4444; }
+.field-error{ color:#ef4444; font-size:12px; margin-top:4px; display:none }
+.progress-row{ display:flex; align-items:center; gap:8px; margin-bottom:16px }
+.progress-text{ font-size:14px; color:var(--muted) }
+.progress-bar{ flex:1; height:4px; background:var(--border); border-radius:4px; overflow:hidden }
+.progress-fill{ height:100%; width:20%; background:var(--primary) }
 </style>
 </head>
 <body>
 
 <div class="card">
-  <h1>إنشاء حساب جديد</h1>
+  <div class="progress-row">
+    <span id="progress-text" class="progress-text">1/5</span>
+    <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+  </div>
 
-  <label>الاسم الكامل</label>
-  <input id="full_name" placeholder="مثال: محمد أحمد" />
+  <div id="step1">
+    <h1>إنشاء حساب جديد</h1>
 
-  <label>رقم الهاتف (ليبيا)</label>
-  <div class="phone-container">
-    <div class="phone-prefix">
-      <img src="https://flagcdn.com/w20/ly.png" alt="LY" />
-      +218
+    <label>الاسم الكامل</label>
+    <input id="full_name" placeholder="مثال: محمد أحمد" />
+    <div id="full_name_err" class="field-error"></div>
+
+    <label>رقم الهاتف (ليبيا)</label>
+    <div class="phone-container">
+      <div class="phone-prefix">
+        <img src="https://flagcdn.com/w20/ly.png" alt="LY" />
+        +218
+      </div>
+      <input id="phone" class="phone-input" placeholder="0912345678" maxlength="10" />
     </div>
-    <input id="phone" class="phone-input" placeholder="0912345678" maxlength="10" />
+    <div class="help">يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.</div>
+    <div id="phone_err" class="field-error"></div>
+
+    <label>البريد الإلكتروني</label>
+    <input id="email" placeholder="name@example.com" />
+    <div id="email_err" class="field-error"></div>
+
+    <label>كلمة المرور</label>
+    <input id="password" type="password" placeholder="********" />
+    <div id="password-rules">
+      <p id="rule-lower" class="rule red">● حرف صغير (a-z)</p>
+      <p id="rule-upper" class="rule red">● حرف كبير (A-Z)</p>
+      <p id="rule-number" class="rule red">● رقم (0-9)</p>
+      <p id="rule-length" class="rule red">● 8 أحرف+</p>
+    </div>
+    <div id="password_err" class="field-error"></div>
+
+    <button id="backBtn" class="secondary" style="display:none">رجوع</button>
+    <button id="nextBtn" disabled>التالي</button>
+
+    <div class="link">
+      <a href="/login.html">عندي حساب؟ تسجيل دخول</a> | <a href="/">الصفحة الرئيسية</a>
+    </div>
   </div>
-  <div class="help">يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.</div>
 
-  <label>البريد الإلكتروني</label>
-  <input id="email" placeholder="name@example.com" />
-
-  <label>كلمة المرور</label>
-  <input id="password" type="password" placeholder="********" />
-  <div id="password-rules">
-    <p id="rule-lower" class="rule red">● حرف صغير (a-z)</p>
-    <p id="rule-upper" class="rule red">● حرف كبير (A-Z)</p>
-    <p id="rule-number" class="rule red">● رقم (0-9)</p>
-    <p id="rule-length" class="rule red">● 8 أحرف+</p>
-  </div>
-
-  <label>تأكيد كلمة المرور</label>
-  <input id="password2" type="password" placeholder="********" />
-
-  <button id="registerBtn">تسجيل</button>
-  <div id="msg" class="msg"></div>
-
-  <div class="link">
-    <a href="/login.html">عندي حساب؟ تسجيل دخول</a> | <a href="/">الصفحة الرئيسية</a>
+  <div id="step2" style="display:none">
+    <h1>الخطوة 2</h1>
+    <p>قريبًا...</p>
   </div>
 </div>
 
 <script>
 // ========== Helpers ==========
-function show(t, err=false){
-  const m = document.getElementById('msg');
-  m.textContent = t; m.className = 'msg ' + (err ? 'err' : 'ok'); m.style.display='block';
-}
 function isLibyanPhone(p){ return /^0(91|92|93|94)\d{7}$/.test(p); }
 function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
 function isStrongPassword(p){
   return /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p) && p.length >= 8;
 }
+
+const wizardState = {};
+
+const fullName = document.getElementById('full_name');
+const phone = document.getElementById('phone');
+const email = document.getElementById('email');
+const password = document.getElementById('password');
+const nextBtn = document.getElementById('nextBtn');
+
+const fullNameErr = document.getElementById('full_name_err');
+const phoneErr = document.getElementById('phone_err');
+const emailErr = document.getElementById('email_err');
+const passwordErr = document.getElementById('password_err');
+
+function validateStep1(){
+  let ok = true;
+
+  if (!fullName.value.trim()){
+    fullNameErr.textContent = 'أدخل الاسم الكامل';
+    fullNameErr.style.display = 'block';
+    ok = false;
+  } else fullNameErr.style.display='none';
+
+  if (!isLibyanPhone(phone.value.trim())){
+    phoneErr.textContent = 'رقم الهاتف غير صحيح';
+    phoneErr.style.display = 'block';
+    ok = false;
+  } else phoneErr.style.display='none';
+
+  if (!email.value.trim() || !isValidEmail(email.value.trim())){
+    emailErr.textContent = 'البريد الإلكتروني غير صالح.';
+    emailErr.style.display = 'block';
+    ok = false;
+  } else emailErr.style.display='none';
+
+  if (!isStrongPassword(password.value.trim())){
+    passwordErr.textContent = 'كلمة المرور ضعيفة.';
+    passwordErr.style.display = 'block';
+    ok = false;
+  } else passwordErr.style.display='none';
+
+  nextBtn.disabled = !ok;
+  return ok;
+}
+
 // ========== Password rules live ==========
-document.getElementById('password').addEventListener('input', function(){
+password.addEventListener('input', function(){
   const pass = this.value;
   document.getElementById('rule-lower').className = /[a-z]/.test(pass) ? 'rule green' : 'rule red';
   document.getElementById('rule-upper').className = /[A-Z]/.test(pass) ? 'rule green' : 'rule red';
   document.getElementById('rule-number').className = /\d/.test(pass) ? 'rule green' : 'rule red';
   document.getElementById('rule-length').className = pass.length >= 8 ? 'rule green' : 'rule red';
+  validateStep1();
 });
 
-// ========== Register submit ==========
-document.getElementById('registerBtn').addEventListener('click', async function(){
-  const full_name = document.getElementById('full_name').value.trim();
-  const phone     = document.getElementById('phone').value.trim();
-  const email     = document.getElementById('email').value.trim();
-  const password  = document.getElementById('password').value.trim();
-  const password2 = document.getElementById('password2').value.trim();
-  document.getElementById('msg').style.display='none';
+fullName.addEventListener('input', validateStep1);
+phone.addEventListener('input', validateStep1);
+email.addEventListener('input', validateStep1);
 
-  if (!full_name){ show('أدخل الاسم الكامل', true); return; }
-  if (!isLibyanPhone(phone)){
-    show('رقم الهاتف غير صحيح. يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.', true); return;
-  }
-  if (!email || !isValidEmail(email)){
-    show('البريد الإلكتروني غير صالح.', true); return;
-  }
-  if (!password || !password2){ show('أدخل كلمة المرور وتأكيدها.', true); return; }
-  if (password !== password2){ show('كلمتا المرور غير متطابقتين.', true); return; }
-  if (!isStrongPassword(password)){
-    show('كلمة المرور ضعيفة. يجب أن تحتوي على حرف صغير، حرف كبير، رقم، وطول لا يقل عن 8.', true); return;
-  }
-
-  try {
-    const r = await fetch('/register', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ full_name, phone, email, password })
-    });
-    const data = await r.json();
-    if (r.ok){
-      if (data.token) localStorage.setItem('floosy_token', data.token);
-      localStorage.setItem('floosy_phone', data.user.phone);
-      localStorage.setItem('signup_email', email);
-      window.location.href = '/verify-email.html';
-    } else {
-      show('❌ ' + (data.error || 'حدث خطأ'), true);
-    }
-  } catch {
-    show('⚠ تعذّر الاتصال بالسيرفر', true);
-  }
+nextBtn.addEventListener('click', function(){
+  if (!validateStep1()) return;
+  wizardState.full_name = fullName.value.trim();
+  wizardState.phone = phone.value.trim();
+  wizardState.email = email.value.trim();
+  wizardState.password = password.value.trim();
+  console.log('go-to-step-2', wizardState);
+  document.getElementById('step1').style.display='none';
+  document.getElementById('step2').style.display='block';
+  document.getElementById('progress-text').textContent = '2/5';
+  document.getElementById('progress-fill').style.width = '40%';
 });
 </script>
 
