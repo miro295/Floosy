@@ -1,4 +1,4 @@
-<!-- public/verify-email.html -->
+<!-- server/public/verify-email.html -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -87,9 +87,8 @@
 
   <script>
     // ===== Config =====
-    const VERIFY_ENDPOINT = "/api/auth/verify-email"; // POST { email, code }
-    const RESEND_ENDPOINT = "/api/auth/resend-otp";   // POST { email }
-    const REDIRECT_AFTER_VERIFY = "/dashboard.html";  // أو إلى صفحة PIN حسب تدفقك
+    const VERIFY_ENDPOINT = "/verify-email";      // POST { email, code }
+    const RESEND_ENDPOINT = "/resend-verify";     // POST { email }
 
     // ===== Email from previous step =====
     const email = (localStorage.getItem("signup_email") || "").trim();
@@ -173,12 +172,14 @@
           headers:{"Content-Type":"application/json"},
           body: JSON.stringify({ email, code })
         });
+        const j = await res.json().catch(()=>({}));
         if (!res.ok){
-          const j = await res.json().catch(()=>({message:"فشل التحقق"}));
-          throw new Error(j.message || "فشل التحقق");
+          throw new Error(j.error || j.message || "فشل التحقق");
         }
-        // نجاح
-        window.location.href = REDIRECT_AFTER_VERIFY; // أو /pin.html حسب خطّتك
+        if (j.token) localStorage.setItem("floosy_token", j.token);
+        if (j?.user?.phone) localStorage.setItem("floosy_phone", j.user.phone);
+        const target = j.set_pin ? "/create-pin.html" : "/dashboard.html";
+        window.location.href = target;
       }catch(e){
         err.textContent = e.message || "فشل التحقق. حاول مرة أخرى.";
       }finally{
@@ -203,9 +204,9 @@
           headers:{"Content-Type":"application/json"},
           body: JSON.stringify({ email })
         });
+        const j = await res.json().catch(()=>({}));
         if (!res.ok){
-          const j = await res.json().catch(()=>({message:"تعذّر إرسال الكود"}));
-          throw new Error(j.message || "تعذّر إرسال الكود");
+          throw new Error(j.error || j.message || "تعذّر إرسال الكود");
         }
         setResends(getResends() + 1);
         startTimer();
