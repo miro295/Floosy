@@ -471,7 +471,7 @@ app.get("/admin", (_req, res) => res.sendFile(path.join(__dirname, "public", "ad
 app.get("/admin.html", (_req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 
 // Static AFTER page routes
-app.use(express.static(path.join(__dirname, "public"), { maxAge: "1h", etag: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ====== Force HTTPS in prod ======
 app.use((req, res, next) => {
