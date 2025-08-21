@@ -1,4 +1,3 @@
-<!-- server/public/verify-email.html -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -6,57 +5,37 @@
   <title>تأكيد البريد الإلكتروني - FLOOSY</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{
-      --bg:#0f172a; --card:#111827; --text:#e5e7eb; --primary:#22c55e;
-      --muted:#94a3b8; --border:rgba(148,163,184,.15); --primary-hover:#16a34a;
-      --danger:#ef4444; --ring:rgba(56,189,248,.25);
-    }
+    :root{--bg:#0f172a;--card:#111827;--text:#e5e7eb;--muted:#94a3b8;--border:rgba(148,163,184,.15);--primary:#22c55e;--primary-hover:#3b82f6;--danger:#ef4444;--ring:rgba(56,189,248,.25)}
     *{box-sizing:border-box}
-    body{
-      margin:0; min-height:100vh; background:linear-gradient(180deg,#0b1220,#0f172a);
-      color:var(--text); font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      display:grid; place-items:center; padding:20px;
-    }
-    .card{
-      width:min(520px,94vw); background:var(--card); border:1px solid var(--border);
-      border-radius:20px; box-shadow:0 12px 35px rgba(0,0,0,.35); padding:20px;
-    }
-    h1{margin:0 0 8px; font-size:22px}
-    p{margin:6px 0 16px; color:var(--muted); line-height:1.6}
-    .top-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
-    .badge{
-      display:flex; align-items:center; gap:8px;
-      padding:8px 12px; border:1px solid var(--border); border-radius:12px; font-size:14px; background:#0b1324;
-    }
-    .link-btn{
-      background:#0b1324; border:1px solid var(--border); color:#93c5fd;
-      border-radius:10px; padding:8px 10px; cursor:pointer; font-weight:600;
-      transition:.15s border, .15s box-shadow, .15s transform;
-    }
-    .link-btn:hover{ transform:translateY(-1px); box-shadow:0 0 0 6px var(--ring); border-color:#60a5fa; }
-    .otp-input{
-      direction:ltr; letter-spacing:8px; width:100%; height:56px; font-size:28px;
-      border:1px solid var(--border); border-radius:12px; background:#0b1324; color:#e5e7eb; text-align:center;
-      outline:none; margin-top:10px;
-    }
-    .otp-input:focus{ border-color:#38bdf8; box-shadow:0 0 0 6px var(--ring); }
-    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px}
-    .btn{
-      padding:12px 14px; border-radius:12px; border:1px solid var(--border);
-      background:#0b1324; color:var(--text); cursor:pointer; font-weight:700; flex:1;
-    }
-    .btn.primary{ background:var(--primary); border-color:transparent; color:#062b1a }
-    .btn.primary:hover{ background:var(--primary-hover) }
-    .btn:disabled{ opacity:.55; cursor:not-allowed }
-    .hint{ color:var(--muted); font-size:13px; margin-top:4px }
-    .error{ color:var(--danger); margin-top:8px; min-height:20px; font-size:14px }
-    .sep{ height:1px; background:var(--border); margin:14px 0 }
-    .meta{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap }
-    .tag{ font-size:12px; color:#cbd5e1; border:1px solid rgba(148,163,184,.25); background:rgba(148,163,184,.08); padding:4px 10px; border-radius:999px }
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#22c55e,#3b82f6);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;padding:20px}
+    .card{width:min(520px,94vw);background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 12px 35px rgba(0,0,0,.35);padding:20px}
+    h1{margin:0 0 8px;font-size:22px}
+    p{margin:6px 0 16px;color:var(--muted);line-height:1.6}
+    .top-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .badge{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:12px;font-size:14px;background:#0b1324}
+    .link-btn{background:#0b1324;border:1px solid var(--border);color:#93c5fd;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:600;transition:.15s border,.15s box-shadow,.15s transform}
+    .link-btn:hover{transform:translateY(-1px);box-shadow:0 0 0 6px var(--ring);border-color:#60a5fa}
+    .otp-input{direction:ltr;letter-spacing:8px;width:100%;height:56px;font-size:28px;border:1px solid var(--border);border-radius:12px;background:#0b1324;color:#e5e7eb;text-align:center;outline:none;margin-top:10px}
+    .otp-input:focus{border-color:#38bdf8;box-shadow:0 0 0 6px var(--ring)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+    .btn{padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#0b1324;color:var(--text);cursor:pointer;font-weight:700;flex:1}
+    .btn.primary{background:var(--primary);border-color:transparent;color:#062b1a}
+    .btn.primary:hover{background:var(--primary-hover);color:#fff}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .hint{color:var(--muted);font-size:13px;margin-top:4px}
+    .error{color:var(--danger);margin-top:8px;min-height:20px;font-size:14px}
+    .sep{height:1px;background:var(--border);margin:14px 0}
+    .meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .tag{font-size:12px;color:#cbd5e1;border:1px solid rgba(148,163,184,.25);background:rgba(148,163,184,.08);padding:4px 10px;border-radius:999px}
+    .progress{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+    .progress-bar{flex:1;height:6px;background:#1f2937;border-radius:3px;overflow:hidden}
+    .progress-bar-inner{height:100%;background:linear-gradient(90deg,#22c55e,#3b82f6);width:80%}
+    .progress-text{font-size:14px;color:var(--muted)}
   </style>
 </head>
 <body>
   <main class="card" aria-labelledby="title">
+    <div class="progress"><div class="progress-text">4/5</div><div class="progress-bar"><div class="progress-bar-inner"></div></div></div>
     <h1 id="title">أدخل كود التأكيد</h1>
     <p>أرسلنا كود مكوّن من 6 أرقام إلى بريدك الإلكتروني. رجاءً اكتبه بالأسفل للتحقق.</p>
 
@@ -67,7 +46,6 @@
       <button id="changeEmailBtn" class="link-btn">تغيير البريد</button>
     </div>
 
-    <!-- حقل واحد للكود -->
     <input id="otpInput" class="otp-input" type="text" inputmode="numeric" pattern="\d*" maxlength="6" placeholder="● ● ● ● ● ●" />
 
     <div class="row">
@@ -86,11 +64,8 @@
   </main>
 
   <script>
-    // ===== Config =====
-    const VERIFY_ENDPOINT = "/verify-email";      // POST { email, code }
-    const RESEND_ENDPOINT = "/resend-verify";     // POST { email }
-
-    // ===== Email from previous step =====
+    const VERIFY_ENDPOINT = "/verify-email";
+    const RESEND_ENDPOINT = "/resend-verify";
     const email = (localStorage.getItem("signup_email") || "").trim();
     const emailBadge = document.getElementById("emailBadge");
     emailBadge.textContent = email ? `البريد: ${email}` : "البريد: —";
@@ -103,124 +78,105 @@
     const sec = document.getElementById("sec");
     const remain = document.getElementById("remain");
 
-    // ===== Resend control (10 مرات / 60 ثانية) =====
-    const RESEND_KEY = "verify_email_resends";
     const STARTED_AT_KEY = "verify_email_timer_started_at";
     const MAX_RESENDS = 10;
-    const COOLDOWN = 60; // ثواني
+    const COOLDOWN = 60;
+
+    const today = new Date().toISOString().slice(0,10);
+    const RESEND_KEY = email ? `resends:${email}:${today}` : null;
 
     function getResends(){
-      const n = parseInt(localStorage.getItem(RESEND_KEY) || "0", 10);
-      return isNaN(n) ? 0 : n;
+      if(!RESEND_KEY) return 0;
+      const n=parseInt(localStorage.getItem(RESEND_KEY)||"0",10);
+      return isNaN(n)?0:n;
     }
     function setResends(n){
-      localStorage.setItem(RESEND_KEY, String(n));
-      remain.textContent = String(Math.max(0, MAX_RESENDS - n));
+      if(RESEND_KEY) localStorage.setItem(RESEND_KEY,String(n));
+      remain.textContent=String(Math.max(0,MAX_RESENDS-n));
     }
-
     function updateTimer(){
-      const started = parseInt(localStorage.getItem(STARTED_AT_KEY) || "0", 10);
-      const elapsed = Math.floor((Date.now() - started)/1000);
-      const left = Math.max(0, COOLDOWN - elapsed);
-      sec.textContent = String(left);
-      resendBtn.disabled = left > 0 || getResends() >= MAX_RESENDS;
+      const started=parseInt(localStorage.getItem(STARTED_AT_KEY)||"0",10);
+      const elapsed=Math.floor((Date.now()-started)/1000);
+      const left=Math.max(0,COOLDOWN-elapsed);
+      sec.textContent=String(left);
+      resendBtn.disabled=left>0||getResends()>=MAX_RESENDS;
       return left;
     }
     function startTimer(){
-      localStorage.setItem(STARTED_AT_KEY, String(Date.now()));
-      resendBtn.disabled = true;
-      const t = setInterval(()=>{
-        const left = updateTimer();
-        if (left <= 0){ clearInterval(t); }
-      }, 250);
+      localStorage.setItem(STARTED_AT_KEY,String(Date.now()));
+      resendBtn.disabled=true;
+      const t=setInterval(()=>{ if(updateTimer()<=0) clearInterval(t); },250);
     }
 
-    // init
-    if (!localStorage.getItem(STARTED_AT_KEY)){ startTimer(); }
-    else { updateTimer(); }
+    if(!localStorage.getItem(STARTED_AT_KEY)) startTimer(); else updateTimer();
     setResends(getResends());
     otpInput.focus();
+    verifyBtn.disabled=true;
 
-    // UX: أرقام فقط + إرسال تلقائي عند 6
-    otpInput.addEventListener("input", ()=>{
-      otpInput.value = otpInput.value.replace(/\D/g,'').slice(0,6);
-      if (otpInput.value.length === 6) verify();
+    otpInput.addEventListener("input",()=>{
+      otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,6);
+      verifyBtn.disabled=otpInput.value.length!==6||isLocked();
+      if(otpInput.value.length===6 && !isLocked()) verify();
     });
 
+    const ATTEMPT_KEY="verify_attempts"; const LOCK_KEY="verify_locked_until"; const MAX_ATTEMPTS=5;
+    function getAttempts(){return parseInt(sessionStorage.getItem(ATTEMPT_KEY)||"0",10)||0;}
+    function setAttempts(n){sessionStorage.setItem(ATTEMPT_KEY,String(n));}
+    function isLocked(){const until=parseInt(sessionStorage.getItem(LOCK_KEY)||"0",10);return Date.now()<until;}
+    function lock(){sessionStorage.setItem(LOCK_KEY,String(Date.now()+3600*1000));}
+
+    if(isLocked()){ verifyBtn.disabled=true; err.textContent="تم حظر التحقق مؤقتًا، حاول لاحقًا"; }
+
     function setLoading(on){
-      verifyBtn.disabled = on;
-      resendBtn.disabled = on || updateTimer()>0 || getResends()>=MAX_RESENDS;
-      changeEmailBtn.disabled = on;
-      otpInput.disabled = on;
+      verifyBtn.disabled=on || isLocked() || otpInput.value.length!==6;
+      resendBtn.disabled=on || updateTimer()>0 || getResends()>=MAX_RESENDS;
+      changeEmailBtn.disabled=on;
+      otpInput.disabled=on;
     }
 
     async function verify(){
-      err.textContent = "";
-      const code = (otpInput.value || "").trim();
-      if (code.length !== 6 || !/^\d{6}$/.test(code)){
-        err.textContent = "رجاءً أدخل الكود الصحيح (6 أرقام).";
-        return;
-      }
-      if (!email){
-        err.textContent = "البريد غير معروف. ارجع لخطوة التسجيل.";
-        return;
-      }
+      if(isLocked()){ err.textContent="تم حظر التحقق مؤقتًا، حاول لاحقًا"; return; }
+      err.textContent="";
+      const code=(otpInput.value||"").trim();
+      if(code.length!==6||!/^[0-9]{6}$/.test(code)){ err.textContent="رجاءً أدخل الكود الصحيح (6 أرقام)."; return; }
+      if(!email){ err.textContent="البريد غير معروف. ارجع لخطوة التسجيل."; return; }
       try{
         setLoading(true);
-        const res = await fetch(VERIFY_ENDPOINT, {
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ email, code })
-        });
-        const j = await res.json().catch(()=>({}));
-        if (!res.ok){
-          throw new Error(j.error || j.message || "فشل التحقق");
-        }
-        if (j.token) localStorage.setItem("floosy_token", j.token);
-        if (j?.user?.phone) localStorage.setItem("floosy_phone", j.user.phone);
-        const target = j.set_pin ? "/create-pin.html" : "/dashboard.html";
-        window.location.href = target;
+        const res=await fetch(VERIFY_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code})});
+        const j=await res.json().catch(()=>({}));
+        if(!res.ok){ throw new Error(j.error||"الكود غير صحيح"); }
+        if(j.token) localStorage.setItem("floosy_token",j.token);
+        if(j?.user?.phone) localStorage.setItem("floosy_phone",j.user.phone);
+        sessionStorage.removeItem(ATTEMPT_KEY);
+        sessionStorage.removeItem(LOCK_KEY);
+        const target=j.set_pin?"/create-pin.html":"/dashboard.html";
+        window.location.href=target;
       }catch(e){
-        err.textContent = e.message || "فشل التحقق. حاول مرة أخرى.";
-      }finally{
-        setLoading(false);
-      }
+        if(e.message.includes("غير صحيح")){
+          const a=getAttempts()+1; setAttempts(a);
+          if(a>=MAX_ATTEMPTS){ lock(); err.textContent="تم حظر التحقق مؤقتًا، حاول لاحقًا"; verifyBtn.disabled=true; }
+          else err.textContent="الكود غير صحيح";
+        }else{ err.textContent="تعذّر الاتصال بالخادم"; }
+      }finally{ setLoading(false); }
     }
 
     async function resend(){
-      err.textContent = "";
-      if (getResends() >= MAX_RESENDS){
-        err.textContent = "وصلت الحد الأقصى لإعادة الإرسال.";
-        return;
-      }
-      if (!email){
-        err.textContent = "البريد غير معروف. ارجع لخطوة التسجيل.";
-        return;
-      }
+      err.textContent="";
+      if(getResends()>=MAX_RESENDS){ err.textContent="وصلت الحد الأقصى لإعادة الإرسال."; return; }
+      if(!email){ err.textContent="البريد غير معروف. ارجع لخطوة التسجيل."; return; }
       try{
         setLoading(true);
-        const res = await fetch(RESEND_ENDPOINT, {
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ email })
-        });
-        const j = await res.json().catch(()=>({}));
-        if (!res.ok){
-          throw new Error(j.error || j.message || "تعذّر إرسال الكود");
-        }
-        setResends(getResends() + 1);
-        startTimer();
-      }catch(e){
-        err.textContent = e.message || "تعذّر إرسال الكود. جرّب لاحقًا.";
-      }finally{
-        setLoading(false);
-      }
+        const res=await fetch(RESEND_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+        const j=await res.json().catch(()=>({}));
+        if(!res.ok){ throw new Error(j.error||"تعذّر إرسال الكود"); }
+        setResends(getResends()+1); startTimer();
+      }catch(e){ err.textContent=e.message||"تعذّر إرسال الكود. جرّب لاحقًا."; }finally{ setLoading(false); }
     }
 
-    verifyBtn.addEventListener("click", verify);
-    resendBtn.addEventListener("click", resend);
-    changeEmailBtn.addEventListener("click", ()=> { window.location.href = "/change-email.html"; });
-    document.addEventListener("keydown", (e)=>{ if(e.key === "Enter") verify(); });
+    verifyBtn.addEventListener("click",verify);
+    resendBtn.addEventListener("click",resend);
+    changeEmailBtn.addEventListener("click",()=>{window.location.href="/change-email.html"});
+    document.addEventListener("keydown",e=>{ if(e.key==="Enter" && !verifyBtn.disabled) verify(); });
   </script>
 </body>
 </html>
