@@ -1,163 +1,196 @@
 <!DOCTYPE html>
-<!-- public/register.html -->
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8" />
-<title>إنشاء حساب جديد - Floosy</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>
-:root {
-  --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
-  --primary:#22c55e; --primary-hover:#16a34a;
-  --border:rgba(148,163,184,.15); --shadow:0 12px 35px rgba(0,0,0,.35);
-}
-body {
-  margin:0; min-height:100vh; display:grid; place-items:center;
-  background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
-  font-family:system-ui, sans-serif; color:var(--text);
-}
-.card {
-  background:var(--card); border:1px solid var(--border); border-radius:16px;
-  box-shadow:var(--shadow); padding:24px; width:100%; max-width:420px;
-}
-h1 { text-align:center; margin-bottom:20px }
-label { display:block; margin-top:12px; font-size:14px; color:var(--muted) }
-input {
-  width:100%; padding:10px; margin-top:6px;
-  border:1px solid var(--border); border-radius:8px;
-  background:#1f2937; color:var(--text);
-}
-button {
-  width:100%; padding:12px; margin-top:18px;
-  background:var(--primary); color:#fff; border:none;
-  border-radius:8px; font-size:16px; cursor:pointer;
-}
-button:hover { background:var(--primary-hover) }
-.msg {
-  margin-top:15px; padding:10px; border-radius:8px; display:none;
-  font-size:14px; text-align:center;
-}
-.ok { background:#065f46; color:#d1fae5 }
-.err { background:#7f1d1d; color:#fee2e2 }
-.link { text-align:center; margin-top:12px; font-size:14px }
-.link a { color:var(--primary); text-decoration:none }
-.phone-container { display:flex; align-items:center; gap:5px; }
-.phone-prefix {
-  background:#1f2937; padding:10px; border-radius:8px;
-  border:1px solid var(--border); color:var(--text);
-  display:flex; align-items:center; gap:6px; white-space:nowrap;
-}
-.phone-prefix img { width:20px; height:14px; }
-.phone-input { flex:1; }
-.help { color:var(--muted); font-size:12px; margin-top:4px }
-.rule { font-size:12px; margin:3px 0; }
-.rule.green { color:#22c55e; }
-.rule.red { color:#ef4444; }
-</style>
+  <meta charset="UTF-8" />
+  <title>إنشاء حساب - FLOOSY</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f172a;--card:#111827;--text:#e5e7eb;--muted:#94a3b8;--border:rgba(148,163,184,.15);
+      --primary:#22c55e;--primary-hover:#3b82f6;
+    }
+    body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,sans-serif;
+      background:linear-gradient(180deg,#22c55e,#3b82f6);color:var(--text)}
+    .box{background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 12px 35px rgba(0,0,0,.35);
+      padding:24px;width:100%;max-width:420px}
+    h1{text-align:center;margin:0 0 20px}
+    .progress{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+    .progress-bar{flex:1;height:6px;background:#1f2937;border-radius:3px;overflow:hidden}
+    .progress-bar-inner{height:100%;background:linear-gradient(90deg,#22c55e,#3b82f6);width:0%}
+    .progress-text{font-size:14px;color:var(--muted)}
+    .step{display:none}
+    .step.active{display:block}
+    .input-group{position:relative;margin-top:12px}
+    .input-group input{width:100%;padding:10px;padding-right:36px;border:1px solid var(--border);border-radius:12px;background:#1f2937;color:var(--text)}
+    .input-group .icon{position:absolute;top:50%;right:10px;transform:translateY(-50%);opacity:.6}
+    button{width:100%;padding:12px;margin-top:18px;border:none;border-radius:12px;font-size:16px;cursor:pointer;background:var(--primary);color:#062b1a;font-weight:700}
+    button:hover{background:var(--primary-hover);color:#fff}
+    button:disabled{opacity:.4;cursor:not-allowed}
+    .err{color:#f87171;font-size:13px;margin-top:4px;min-height:18px}
+    label.chk{display:flex;align-items:center;margin-top:12px;font-size:14px;color:var(--muted)}
+    label.chk input{margin-left:8px}
+    .center{text-align:center;margin-top:20px}
+    .link{margin-top:10px;text-align:center;font-size:14px}
+    .link a{color:#22c55e;text-decoration:none}
+  </style>
 </head>
 <body>
-
-<div class="card">
-  <h1>إنشاء حساب جديد</h1>
-
-  <label>الاسم الكامل</label>
-  <input id="full_name" placeholder="مثال: محمد أحمد" />
-
-  <label>رقم الهاتف (ليبيا)</label>
-  <div class="phone-container">
-    <div class="phone-prefix">
-      <img src="https://flagcdn.com/w20/ly.png" alt="LY" />
-      +218
+  <div class="box">
+    <div class="progress">
+      <div class="progress-text" id="progText">1/5</div>
+      <div class="progress-bar"><div id="progBar" class="progress-bar-inner"></div></div>
     </div>
-    <input id="phone" class="phone-input" placeholder="0912345678" maxlength="10" />
+
+    <div id="step1" class="step active">
+      <h1>معلومات أساسية</h1>
+      <div class="input-group">
+        <span class="icon">👤</span>
+        <input id="full_name" placeholder="الاسم الكامل" />
+      </div>
+      <div id="err_full_name" class="err"></div>
+
+      <div class="input-group">
+        <span class="icon">📱</span>
+        <input id="phone" placeholder="0912345678" maxlength="10" />
+      </div>
+      <div id="err_phone" class="err"></div>
+
+      <div class="input-group">
+        <span class="icon">📧</span>
+        <input id="email" placeholder="name@example.com" />
+      </div>
+      <div id="err_email" class="err"></div>
+
+      <div class="input-group">
+        <span class="icon">🔒</span>
+        <input id="password" type="password" placeholder="كلمة المرور" />
+      </div>
+      <div id="password-rules">
+        <p id="rule-lower" class="err">● حرف صغير (a-z)</p>
+        <p id="rule-upper" class="err">● حرف كبير (A-Z)</p>
+        <p id="rule-number" class="err">● رقم (0-9)</p>
+        <p id="rule-length" class="err">● 8 أحرف+</p>
+      </div>
+
+      <label class="chk"><input type="checkbox" id="consent" /> أوافق على شروط الاستخدام وسياسة الخصوصية</label>
+      <div id="err_consent" class="err"></div>
+
+      <button id="next1" disabled>التالي</button>
+    </div>
+
+    <div id="step2" class="step">
+      <h1>تأكيد كلمة المرور</h1>
+      <div class="input-group">
+        <span class="icon">🔒</span>
+        <input id="password2" type="password" placeholder="أعد كتابة كلمة المرور" />
+      </div>
+      <div id="err_pass2" class="err"></div>
+      <button id="back1">رجوع</button>
+      <button id="next2" disabled>تسجيل</button>
+    </div>
+
+    <div id="step3" class="step">
+      <h1>تم إنشاء الحساب</h1>
+      <p class="center">فعل بريدك الإلكتروني</p>
+      <button id="gotoVerify">استمرار</button>
+    </div>
+
+    <div class="link"><a href="/login.html">تسجيل الدخول</a></div>
   </div>
-  <div class="help">يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.</div>
-
-  <label>البريد الإلكتروني</label>
-  <input id="email" placeholder="name@example.com" />
-
-  <label>كلمة المرور</label>
-  <input id="password" type="password" placeholder="********" />
-  <div id="password-rules">
-    <p id="rule-lower" class="rule red">● حرف صغير (a-z)</p>
-    <p id="rule-upper" class="rule red">● حرف كبير (A-Z)</p>
-    <p id="rule-number" class="rule red">● رقم (0-9)</p>
-    <p id="rule-length" class="rule red">● 8 أحرف+</p>
-  </div>
-
-  <label>تأكيد كلمة المرور</label>
-  <input id="password2" type="password" placeholder="********" />
-
-  <button id="registerBtn">تسجيل</button>
-  <div id="msg" class="msg"></div>
-
-  <div class="link">
-    <a href="/login.html">عندي حساب؟ تسجيل دخول</a> | <a href="/">الصفحة الرئيسية</a>
-  </div>
-</div>
 
 <script>
-// ========== Helpers ==========
-function show(t, err=false){
-  const m = document.getElementById('msg');
-  m.textContent = t; m.className = 'msg ' + (err ? 'err' : 'ok'); m.style.display='block';
-}
-function isLibyanPhone(p){ return /^0(91|92|93|94)\d{7}$/.test(p); }
-function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
-function isStrongPassword(p){
-  return /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p) && p.length >= 8;
-}
-// ========== Password rules live ==========
-document.getElementById('password').addEventListener('input', function(){
-  const pass = this.value;
-  document.getElementById('rule-lower').className = /[a-z]/.test(pass) ? 'rule green' : 'rule red';
-  document.getElementById('rule-upper').className = /[A-Z]/.test(pass) ? 'rule green' : 'rule red';
-  document.getElementById('rule-number').className = /\d/.test(pass) ? 'rule green' : 'rule red';
-  document.getElementById('rule-length').className = pass.length >= 8 ? 'rule green' : 'rule red';
-});
+  function isLibyanPhone(p){return /^0(91|92|93|94)\d{7}$/.test(p)}
+  function isValidEmail(e){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)}
+  function isStrongPassword(p){return /[a-z]/.test(p)&&/[A-Z]/.test(p)&&/\d/.test(p)&&p.length>=8}
 
-// ========== Register submit ==========
-document.getElementById('registerBtn').addEventListener('click', async function(){
-  const full_name = document.getElementById('full_name').value.trim();
-  const phone     = document.getElementById('phone').value.trim();
-  const email     = document.getElementById('email').value.trim();
-  const password  = document.getElementById('password').value.trim();
-  const password2 = document.getElementById('password2').value.trim();
-  document.getElementById('msg').style.display='none';
+  const progText=document.getElementById('progText');
+  const progBar=document.getElementById('progBar');
+  let step=1;
+  function updateProg(){progText.textContent=step+'/5';progBar.style.width=(step/5*100)+'%'}
+  updateProg();
 
-  if (!full_name){ show('أدخل الاسم الكامل', true); return; }
-  if (!isLibyanPhone(phone)){
-    show('رقم الهاتف غير صحيح. يجب أن يبدأ بـ 091/092/093/094 وطوله 10 أرقام.', true); return;
-  }
-  if (!email || !isValidEmail(email)){
-    show('البريد الإلكتروني غير صالح.', true); return;
-  }
-  if (!password || !password2){ show('أدخل كلمة المرور وتأكيدها.', true); return; }
-  if (password !== password2){ show('كلمتا المرور غير متطابقتين.', true); return; }
-  if (!isStrongPassword(password)){
-    show('كلمة المرور ضعيفة. يجب أن تحتوي على حرف صغير، حرف كبير، رقم، وطول لا يقل عن 8.', true); return;
-  }
+  const formData={};
+  const full=document.getElementById('full_name');
+  const phone=document.getElementById('phone');
+  const email=document.getElementById('email');
+  const pass=document.getElementById('password');
+  const consent=document.getElementById('consent');
+  const next1=document.getElementById('next1');
 
-  try {
-    const r = await fetch('/register', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ full_name, phone, email, password })
-    });
-    const data = await r.json();
-    if (r.ok){
-      if (data.token) localStorage.setItem('floosy_token', data.token);
-      localStorage.setItem('floosy_phone', data.user.phone);
-      localStorage.setItem('signup_email', email);
-      window.location.href = '/verify-email.html';
-    } else {
-      show('❌ ' + (data.error || 'حدث خطأ'), true);
+  function validateStep1(){
+    let ok=true;
+    document.getElementById('err_full_name').textContent=full.value.trim()?"":"أدخل الاسم";
+    document.getElementById('err_phone').textContent=isLibyanPhone(phone.value)?"":"رقم غير صالح";
+    document.getElementById('err_email').textContent=isValidEmail(email.value)?"":"البريد غير صالح";
+    const p=pass.value;
+    document.getElementById('rule-lower').style.color=/[a-z]/.test(p)?'#22c55e':'#f87171';
+    document.getElementById('rule-upper').style.color=/[A-Z]/.test(p)?'#22c55e':'#f87171';
+    document.getElementById('rule-number').style.color=/\d/.test(p)?'#22c55e':'#f87171';
+    document.getElementById('rule-length').style.color=p.length>=8?'#22c55e':'#f87171';
+    if(!full.value.trim()||!isLibyanPhone(phone.value)||!isValidEmail(email.value)||!isStrongPassword(p)) ok=false;
+    document.getElementById('err_consent').textContent=consent.checked?"":"مطلوب";
+    if(!consent.checked) ok=false;
+    next1.disabled=!ok;
+  }
+  [full,phone,email,pass,consent].forEach(el=>el.addEventListener('input',validateStep1));
+  validateStep1();
+
+  next1.addEventListener('click',()=>{
+    formData.full_name=full.value.trim();
+    formData.phone=phone.value.trim();
+    formData.email=email.value.trim();
+    formData.password=pass.value.trim();
+    step=2;updateProg();
+    document.getElementById('step1').classList.remove('active');
+    document.getElementById('step2').classList.add('active');
+  });
+
+  const back1=document.getElementById('back1');
+  back1.addEventListener('click',()=>{
+    step=1;updateProg();
+    document.getElementById('step2').classList.remove('active');
+    document.getElementById('step1').classList.add('active');
+  });
+
+  const pass2=document.getElementById('password2');
+  const next2=document.getElementById('next2');
+  function validateStep2(){
+    const ok = pass2.value && pass2.value === formData.password;
+    document.getElementById('err_pass2').textContent=ok?"":"الكلمتان غير متطابقتين";
+    next2.disabled=!ok;
+  }
+  pass2.addEventListener('input',validateStep2);
+
+  async function doRegister(){
+    next2.disabled=true;
+    try{
+      const r = await fetch('/register',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({full_name:formData.full_name, email:formData.email, phone:formData.phone, password:formData.password})
+      });
+      const data = await r.json();
+      if(r.ok && data.ok!==false){
+        if(data.token) localStorage.setItem('floosy_token',data.token);
+        if(data.user?.phone) localStorage.setItem('floosy_phone',data.user.phone);
+        localStorage.setItem('signup_email',formData.email);
+        step=3;updateProg();
+        document.getElementById('step2').classList.remove('active');
+        document.getElementById('step3').classList.add('active');
+      }else{
+        const msg=data.error===409||data.error==="email_used"?"هذا البريد مستخدم بالفعل":(data.error||'حدث خطأ');
+        document.getElementById('err_pass2').textContent=msg;
+        next2.disabled=false;
+      }
+    }catch{
+      document.getElementById('err_pass2').textContent='تعذّر الاتصال بالخادم';
+      next2.disabled=false;
     }
-  } catch {
-    show('⚠ تعذّر الاتصال بالسيرفر', true);
   }
-});
-</script>
+  next2.addEventListener('click',doRegister);
 
+  document.getElementById('gotoVerify').addEventListener('click',()=>{
+    window.location.href='/verify-email.html';
+  });
+</script>
 </body>
 </html>
