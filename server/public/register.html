@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- public/register.html -->
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
@@ -95,22 +96,6 @@ button:hover { background:var(--primary-hover) }
   </div>
 </div>
 
-<!-- Modal: تأكيد البريد -->
-<div id="verifyModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,.65);z-index:50">
-  <div style="width:92%;max-width:420px;background:#111827;border:1px solid rgba(148,163,184,.15);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,.35);padding:16px">
-    <h3 style="margin:0 0 8px;color:#e5e7eb">تأكيد البريد الإلكتروني</h3>
-    <p style="margin:0 0 10px;color:#94a3b8" id="verifyEmailHint">أدخل الكود المرسل إلى بريدك.</p>
-    <input id="v_code" placeholder="أدخل الكود (6 أرقام)" maxlength="6"
-           style="width:100%;padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:#0b1324;color:#e5e7eb;outline:none" />
-    <div id="v_msg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:14px;text-align:center"></div>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button id="v_submit" style="flex:1;padding:10px;border:none;border-radius:10px;background:#22c55e;color:#062b1a;font-weight:700;cursor:pointer">تأكيد</button>
-      <button id="v_resend" style="padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:10px;background:#0b1324;color:#e5e7eb;cursor:pointer">إعادة إرسال</button>
-      <button id="v_close"  style="padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:10px;background:#0b1324;color:#e5e7eb;cursor:pointer">إغلاق</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // ========== Helpers ==========
 function show(t, err=false){
@@ -122,79 +107,6 @@ function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
 function isStrongPassword(p){
   return /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p) && p.length >= 8;
 }
-
-// ========== Verify email modal ==========
-let __verifyEmail = ""; // نخزن البريد بعد التسجيل
-
-function openVerifyModal(email){
-  __verifyEmail = email || "";
-  document.getElementById('verifyEmailHint').textContent = "أدخل الكود المرسل إلى: " + (__verifyEmail || "");
-  document.getElementById('v_code').value = "";
-  document.getElementById('v_msg').style.display = 'none';
-  document.getElementById('verifyModal').style.display = 'flex';
-}
-function closeVerifyModal(){
-  document.getElementById('verifyModal').style.display = 'none';
-}
-function vshow(t, ok=false){
-  const el = document.getElementById('v_msg');
-  el.textContent = t;
-  el.style.display = 'block';
-  el.style.background = ok ? '#065f46' : '#7f1d1d';
-  el.style.color = ok ? '#d1fae5' : '#fee2e2';
-}
-
-document.getElementById('v_close').addEventListener('click', closeVerifyModal);
-document.getElementById('v_submit').addEventListener('click', async function(){
-  const code = document.getElementById('v_code').value.trim();
-  if (!code || !/^\d{4,6}$/.test(code)){ vshow('أدخل كود صحيح'); return; }
-  try{
-    const r = await fetch('/verify-email', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ email: __verifyEmail, code })
-    });
-    const data = await r.json();
-    if(r.ok){
-      vshow('تم تأكيد البريد بنجاح ✅', true);
-
-      // خزّن التوكن والبيانات لو رجعها السيرفر
-      if (data.token) localStorage.setItem('floosy_token', data.token);
-      if (data?.user?.phone) localStorage.setItem('floosy_phone', data.user.phone);
-
-      // ادخل مباشرة للداشبورد
-      setTimeout(()=>{
-if (data.set_pin) {
-    window.location.href = "/create-pin.html";
-} else {
-    window.location.href = "/dashboard.html";
-}
-      }, 600);
-
-    } else {
-      vshow(data.error || 'فشل التأكيد', false);
-    }
-  }catch{
-    vshow('تعذّر الاتصال بالسيرفر');
-  }
-});
-
-document.getElementById('v_resend').addEventListener('click', async function(){
-  if(!__verifyEmail){ vshow('بريد غير معروف'); return; }
-  try{
-    const r = await fetch('/resend-verify', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ email: __verifyEmail })
-    });
-    const data = await r.json();
-    if(r.ok){ vshow('تم إرسال كود جديد ✉️', true); }
-    else   { vshow(data.error || 'تعذّر الإرسال'); }
-  }catch{
-    vshow('تعذّر الاتصال بالسيرفر');
-  }
-});
-
 // ========== Password rules live ==========
 document.getElementById('password').addEventListener('input', function(){
   const pass = this.value;
@@ -236,8 +148,8 @@ document.getElementById('registerBtn').addEventListener('click', async function(
     if (r.ok){
       if (data.token) localStorage.setItem('floosy_token', data.token);
       localStorage.setItem('floosy_phone', data.user.phone);
-      show('✅ تم إنشاء الحساب. تم إرسال كود إلى بريدك لتأكيده.');
-      openVerifyModal(email); // افتح مودال التأكيد
+      localStorage.setItem('signup_email', email);
+      window.location.href = '/verify-email.html';
     } else {
       show('❌ ' + (data.error || 'حدث خطأ'), true);
     }
