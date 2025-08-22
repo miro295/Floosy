@@ -1,0 +1,229 @@
+<!-- server/public/verify-email.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <link href="/styles/base.css" rel="stylesheet">
+  <link href="/styles/theme.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>تأكيد البريد الإلكتروني - FLOOSY</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f172a; --card:#111827; --text:#e5e7eb; --primary:#22c55e;
+      --muted:#94a3b8; --border:rgba(148,163,184,.15); --primary-hover:#16a34a;
+      --danger:#ef4444; --ring:rgba(56,189,248,.25);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; background:linear-gradient(180deg,#0b1220,#0f172a);
+      color:var(--text); font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      display:grid; place-items:center; padding:20px;
+    }
+    .card{
+      width:min(520px,94vw); background:var(--card); border:1px solid var(--border);
+      border-radius:20px; box-shadow:0 12px 35px rgba(0,0,0,.35); padding:20px;
+    }
+    h1{margin:0 0 8px; font-size:22px}
+    p{margin:6px 0 16px; color:var(--muted); line-height:1.6}
+    .top-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
+    .badge{
+      display:flex; align-items:center; gap:8px;
+      padding:8px 12px; border:1px solid var(--border); border-radius:12px; font-size:14px; background:#0b1324;
+    }
+    .link-btn{
+      background:#0b1324; border:1px solid var(--border); color:#93c5fd;
+      border-radius:10px; padding:8px 10px; cursor:pointer; font-weight:600;
+      transition:.15s border, .15s box-shadow, .15s transform;
+    }
+    .link-btn:hover{ transform:translateY(-1px); box-shadow:0 0 0 6px var(--ring); border-color:#60a5fa; }
+    .otp-input{
+      direction:ltr; letter-spacing:8px; width:100%; height:56px; font-size:28px;
+      border:1px solid var(--border); border-radius:12px; background:#0b1324; color:#e5e7eb; text-align:center;
+      outline:none; margin-top:10px;
+    }
+    .otp-input:focus{ border-color:#38bdf8; box-shadow:0 0 0 6px var(--ring); }
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px}
+    .btn{
+      padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+      background:#0b1324; color:var(--text); cursor:pointer; font-weight:700; flex:1;
+    }
+    .btn.primary{ background:var(--primary); border-color:transparent; color:#062b1a }
+    .btn.primary:hover{ background:var(--primary-hover) }
+    .btn:disabled{ opacity:.55; cursor:not-allowed }
+    .hint{ color:var(--muted); font-size:13px; margin-top:4px }
+    .error{ color:var(--danger); margin-top:8px; min-height:20px; font-size:14px }
+    .sep{ height:1px; background:var(--border); margin:14px 0 }
+    .meta{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap }
+    .tag{ font-size:12px; color:#cbd5e1; border:1px solid rgba(148,163,184,.25); background:rgba(148,163,184,.08); padding:4px 10px; border-radius:999px }
+  </style>
+</head>
+<body>
+  <main class="card" aria-labelledby="title">
+    <h1 id="title">أدخل كود التأكيد</h1>
+    <p>أرسلنا كود مكوّن من 6 أرقام إلى بريدك الإلكتروني. رجاءً اكتبه بالأسفل للتحقق.</p>
+
+    <div class="top-row">
+      <div class="badge">
+        <span id="emailBadge">البريد: —</span>
+      </div>
+      <button id="changeEmailBtn" class="link-btn">تغيير البريد</button>
+    </div>
+
+    <!-- حقل واحد للكود -->
+    <input id="otpInput" class="otp-input" type="text" inputmode="numeric" pattern="\d*" maxlength="6" placeholder="● ● ● ● ● ●" />
+
+    <div class="row">
+      <button id="verifyBtn" class="btn primary">تأكيد</button>
+      <button id="resendBtn" class="btn">إعادة إرسال (<span id="sec">60</span>s)</button>
+    </div>
+
+    <div class="meta">
+      <div class="hint">المحاولات المتبقية للإرسال: <b id="remain">10</b></div>
+      <div class="tag">انتهاء الكود سريعًا لأمانك</div>
+    </div>
+
+    <div id="error" class="error" role="alert" aria-live="polite"></div>
+    <div class="sep"></div>
+    <div class="hint">لو ما وصلك الإيميل، افحص صندوق الرسائل غير المرغوب فيها (Spam).</div>
+  </main>
+
+  <script>
+    // ===== Config =====
+    const VERIFY_ENDPOINT = "/verify-email";      // POST { email, code }
+    const RESEND_ENDPOINT = "/resend-verify";     // POST { email }
+
+    // ===== Email from previous step =====
+    const email = (localStorage.getItem("signup_email") || "").trim();
+    const emailBadge = document.getElementById("emailBadge");
+    emailBadge.textContent = email ? `البريد: ${email}` : "البريد: —";
+
+    const otpInput = document.getElementById("otpInput");
+    const verifyBtn = document.getElementById("verifyBtn");
+    const resendBtn = document.getElementById("resendBtn");
+    const changeEmailBtn = document.getElementById("changeEmailBtn");
+    const err = document.getElementById("error");
+    const sec = document.getElementById("sec");
+    const remain = document.getElementById("remain");
+
+    // ===== Resend control (10 مرات / 60 ثانية) =====
+    const RESEND_KEY = "verify_email_resends";
+    const STARTED_AT_KEY = "verify_email_timer_started_at";
+    const MAX_RESENDS = 10;
+    const COOLDOWN = 60; // ثواني
+
+    function getResends(){
+      const n = parseInt(localStorage.getItem(RESEND_KEY) || "0", 10);
+      return isNaN(n) ? 0 : n;
+    }
+    function setResends(n){
+      localStorage.setItem(RESEND_KEY, String(n));
+      remain.textContent = String(Math.max(0, MAX_RESENDS - n));
+    }
+
+    function updateTimer(){
+      const started = parseInt(localStorage.getItem(STARTED_AT_KEY) || "0", 10);
+      const elapsed = Math.floor((Date.now() - started)/1000);
+      const left = Math.max(0, COOLDOWN - elapsed);
+      sec.textContent = String(left);
+      resendBtn.disabled = left > 0 || getResends() >= MAX_RESENDS;
+      return left;
+    }
+    function startTimer(){
+      localStorage.setItem(STARTED_AT_KEY, String(Date.now()));
+      resendBtn.disabled = true;
+      const t = setInterval(()=>{
+        const left = updateTimer();
+        if (left <= 0){ clearInterval(t); }
+      }, 250);
+    }
+
+    // init
+    if (!localStorage.getItem(STARTED_AT_KEY)){ startTimer(); }
+    else { updateTimer(); }
+    setResends(getResends());
+    otpInput.focus();
+
+    // UX: أرقام فقط + إرسال تلقائي عند 6
+    otpInput.addEventListener("input", ()=>{
+      otpInput.value = otpInput.value.replace(/\D/g,'').slice(0,6);
+      if (otpInput.value.length === 6) verify();
+    });
+
+    function setLoading(on){
+      verifyBtn.disabled = on;
+      resendBtn.disabled = on || updateTimer()>0 || getResends()>=MAX_RESENDS;
+      changeEmailBtn.disabled = on;
+      otpInput.disabled = on;
+    }
+
+    async function verify(){
+      err.textContent = "";
+      const code = (otpInput.value || "").trim();
+      if (code.length !== 6 || !/^\d{6}$/.test(code)){
+        err.textContent = "رجاءً أدخل الكود الصحيح (6 أرقام).";
+        return;
+      }
+      if (!email){
+        err.textContent = "البريد غير معروف. ارجع لخطوة التسجيل.";
+        return;
+      }
+      try{
+        setLoading(true);
+        const res = await fetch(VERIFY_ENDPOINT, {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ email, code })
+        });
+        const j = await res.json().catch(()=>({}));
+        if (!res.ok){
+          throw new Error(j.error || j.message || "فشل التحقق");
+        }
+        if (j.token) localStorage.setItem("floosy_token", j.token);
+        if (j?.user?.phone) localStorage.setItem("floosy_phone", j.user.phone);
+        const target = j.set_pin ? "/create-pin.html" : "/dashboard.html";
+        window.location.href = target;
+      }catch(e){
+        err.textContent = e.message || "فشل التحقق. حاول مرة أخرى.";
+      }finally{
+        setLoading(false);
+      }
+    }
+
+    async function resend(){
+      err.textContent = "";
+      if (getResends() >= MAX_RESENDS){
+        err.textContent = "وصلت الحد الأقصى لإعادة الإرسال.";
+        return;
+      }
+      if (!email){
+        err.textContent = "البريد غير معروف. ارجع لخطوة التسجيل.";
+        return;
+      }
+      try{
+        setLoading(true);
+        const res = await fetch(RESEND_ENDPOINT, {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ email })
+        });
+        const j = await res.json().catch(()=>({}));
+        if (!res.ok){
+          throw new Error(j.error || j.message || "تعذّر إرسال الكود");
+        }
+        setResends(getResends() + 1);
+        startTimer();
+      }catch(e){
+        err.textContent = e.message || "تعذّر إرسال الكود. جرّب لاحقًا.";
+      }finally{
+        setLoading(false);
+      }
+    }
+
+    verifyBtn.addEventListener("click", verify);
+    resendBtn.addEventListener("click", resend);
+    changeEmailBtn.addEventListener("click", ()=> { window.location.href = "/change-email.html"; });
+    document.addEventListener("keydown", (e)=>{ if(e.key === "Enter") verify(); });
+  </script>
+  <script src="/scripts/verify-email.js" defer></script>
+</body>
+</html>

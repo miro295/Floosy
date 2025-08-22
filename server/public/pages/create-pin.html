@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <link href="/styles/base.css" rel="stylesheet">
+  <link href="/styles/theme.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>إنشاء PIN - Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{ --bg:#0f172a; --card:#111827; --text:#e5e7eb; --primary:#22c55e; --muted:#94a3b8; --border:rgba(148,163,184,.15);}    
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#0b1220,#0f172a);color:var(--text);font-family:system-ui,sans-serif;display:grid;place-items:center;padding:20px}
+    .box{background:var(--card);border:1px solid var(--border);padding:24px;border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,.35);width:100%;max-width:420px;text-align:center}
+    h1{margin:0 0 18px}
+    .inputs{display:flex;justify-content:center;gap:8px;margin-bottom:20px}
+    .inputs input{width:42px;height:48px;font-size:28px;text-align:center;border:1px solid var(--border);border-radius:10px;background:#0b1324;color:var(--text)}
+    button{width:100%;padding:12px;background:var(--primary);color:#062b1a;font-weight:700;border:none;border-radius:10px;cursor:pointer}
+    #msg{margin-top:14px;font-size:14px;color:#ef4444;display:none}
+  </style>
+</head>
+<body>
+    <script>
+async function savePin(pin) {
+  try {
+    const r = await fetch("/set-pin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": (localStorage.getItem("csrf") || "")
+      },
+      body: JSON.stringify({ pin })
+    });
+    return await r.json();
+  } catch {
+    return { error: "تعذّر الاتصال" };
+  }
+}
+
+document.getElementById("saveBtn").addEventListener("click", async function(){
+  const box1 = document.getElementById('pin1');
+  const box2 = document.getElementById('pin2');
+  const msg  = document.getElementById('msg');
+
+  const p1 = Array.from(box1.querySelectorAll('input')).map(i=>i.value).join('');
+  const p2 = Array.from(box2.querySelectorAll('input')).map(i=>i.value).join('');
+
+  if (p1.length < 6 || p2.length < 6) {
+    msg.textContent = "أدخل جميع الأرقام";
+    msg.style.display = "block";
+    return;
+  }
+  if (p1 !== p2) {
+    msg.textContent = "الرمزان غير متطابقين";
+    msg.style.display = "block";
+    return;
+  }
+
+  msg.style.display="none";
+  const res = await savePin(p1);
+  if (res.ok) {
+    // نجاح
+    msg.style.color = "#22c55e";
+    msg.textContent = "تم الحفظ بنجاح ✅، جاري التحويل...";
+    msg.style.display = "block";
+    setTimeout(()=> window.location.href = "/dashboard.html", 2000);
+  } else {
+    msg.style.color = "#ef4444";
+    msg.textContent = res.error || "فشل الحفظ";
+    msg.style.display = "block";
+  }
+});
+</script>
+
+<div class="box">
+  <img src="/logo.png" alt="Floosy" style="width:64px;margin-bottom:12px"/>
+  <h1>إنشاء رمز PIN</h1>
+  <p style="color:var(--muted);margin-top:-10px;margin-bottom:20px">أدخل رمز من 6 أرقام</p>
+
+  <!-- first PIN -->
+  <div class="inputs" id="pin1">
+    <input maxlength="1" type="text" />
+    <input maxlength="1" type="text" />
+    <input maxlength="1" type="text" />
+    <input maxlength="1" type="text" />
+    <input maxlength="1" type="text" />
+    <input maxlength="1" type="text" />
+  </div>
+
+  <!-- confirm PIN -->
+  <p style="color:var(--muted);margin:-8px 0 8px">أعد الإدخال للتأكيد</p>
+  <div class="inputs" id="pin2">
+    <input maxlength="1" type="password" />
+    <input maxlength="1" type="password" />
+    <input maxlength="1" type="password" />
+    <input maxlength="1" type="password" />
+    <input maxlength="1" type="password" />
+    <input maxlength="1" type="password" />
+  </div>
+
+  <button id="saveBtn">تأكيد</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+/*
+  ✅ هذا الجزء مسؤول عن:
+  1) التنقل التلقائي بين مربعات الإدخال (bindAutoAdvance)
+  2) إرسال الـ PIN إلى السيرفر عبر POST /set-pin
+  3) التعامل مع رسائل النجاح / الخطأ
+*/
+
+// دالة التنقل التلقائي
+function bindAutoAdvance(container){
+  const inputs = container.querySelectorAll('input');
+  inputs.forEach((inp, i)=>{
+    inp.addEventListener('input',()=>{
+      if(inp.value.length === 1 && i < inputs.length-1){
+        inputs[i+1].focus();
+      }
+    });
+    inp.addEventListener('keydown',(e)=>{
+      if(e.key === 'Backspace' && !inp.value && i > 0){
+        inputs[i-1].focus();
+      }
+    });
+  });
+}
+
+// فعل الدالة على المجموعتين
+bindAutoAdvance(document.getElementById('pin1'));
+bindAutoAdvance(document.getElementById('pin2'));
+
+// استخراج الـ PIN من المربعات
+function getPin(box){
+  return Array.from(box.querySelectorAll('input')).map(i=>i.value).join('');
+}
+
+// زر الحفظ
+document.getElementById("saveBtn").onclick = async () => {
+  const box1 = document.getElementById('pin1');
+  const box2 = document.getElementById('pin2');
+  const msg  = document.getElementById('msg');
+
+  const p1 = getPin(box1);
+  const p2 = getPin(box2);
+
+  if (p1.length < 6 || p2.length < 6) {
+    msg.textContent = "أدخل جميع الأرقام";
+    msg.style.display = "block";
+    msg.style.color = "#ef4444";
+    return;
+  }
+  if (p1 !== p2) {
+    msg.textContent = "الرمزان غير متطابقين";
+    msg.style.display = "block";
+    msg.style.color = "#ef4444";
+    return;
+  }
+
+  // reset message
+  msg.style.display = "none";
+
+  // إرسال إلى backend
+  try{
+    const r = await fetch('/set-pin',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CSRF-Token': getCookie('csrf_token')
+      },
+      body: JSON.stringify({pin:p1})
+    });
+    const data = await r.json();
+
+    if(r.ok && data.ok){
+      msg.style.color = '#22c55e';
+      msg.textContent = '✅ تم تفعيل الـPIN — جاري تحويلك...';
+      msg.style.display = 'block';
+      setTimeout(()=> window.location.href='/dashboard.html', 2000);
+    }else{
+      msg.textContent = (data.error||'حدث خطأ');
+      msg.style.display = 'block';
+      msg.style.color = '#ef4444';
+    }
+  }catch{
+    msg.textContent = 'تعذّر الاتصال بالسيرفر';
+    msg.style.display = 'block';
+    msg.style.color = '#ef4444';
+  }
+};
+
+// Helper لقراءة الـ csrf من الكوكيز
+function getCookie(name){
+  return (document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)')||[])[2];
+}
+</script>
+  <script src="/scripts/pin.js" defer></script>
+</body></html>
