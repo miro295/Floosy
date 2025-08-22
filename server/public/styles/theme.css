@@ -1,0 +1,20 @@
+/* server/public/styles/theme.css */
+:root {
+  --bg:#0f172a;
+  --card:#111827;
+  --muted:#94a3b8;
+  --text:#e5e7eb;
+  --primary:#22c55e;
+  --primary-hover:#16a34a;
+  --border:rgba(148,163,184,.15);
+}
+.banner{
+  margin-top:15px;
+  padding:10px;
+  border-radius:8px;
+  display:none;
+  font-size:14px;
+  text-align:center;
+}
+.banner.success{background:#065f46;color:#d1fae5;}
+.banner.error{background:#7f1d1d;color:#fee2e2;}

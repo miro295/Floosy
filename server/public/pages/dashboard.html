@@ -1,0 +1,1540 @@
+<!-- public/dashboard.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <link href="/styles/base.css" rel="stylesheet">
+  <link href="/styles/theme.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>لوحة العميل - Floosy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    .tag{
+  font-size:12px; color:#cbd5e1;
+  border:1px solid rgba(148,163,184,.25);
+  background: rgba(148,163,184,.08);
+  padding:2px 8px; border-radius:999px;
+}
+
+    /* تعطيل التحديد في أغلب الصفحة */
+body, .shell { user-select: none; }
+/* السماح فقط للمدخلات والأزرار وأكواد النسخ */
+input, textarea, button, .pc-code, .btn-mini, .btn, .profile-pill { user-select: text; }
+
+    :root{
+      --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
+      --primary:#22c55e; --primary-2:#10b981; --accent:#38bdf8;
+      --danger:#ef4444; --warning:#f59e0b; --ring:rgba(56,189,248,.25);
+      --shadow:0 12px 35px rgba(0,0,0,.35); --radius:16px; --border:rgba(148,163,184,.15);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100dvh;
+      background: radial-gradient(1000px 500px at 100% -20%, rgba(56,189,248,.14), transparent 60%),
+                  radial-gradient(1000px 500px at -20% 120%, rgba(34,197,94,.14), transparent 60%),
+                  linear-gradient(180deg,#0b1220 0%,#0f172a 100%);
+      color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+    }
+    .shell{max-width:1180px; margin-inline:auto; padding:24px;}
+    header{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:18px;}
+    .brand{ display:flex; align-items:center; gap:12px;}
+    .logo{width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,var(--primary) 0%, var(--accent) 100%); box-shadow:0 6px 18px rgba(34,197,94,.35)}
+    .brand h1{font-size:18px; margin:0}
+    .avatar{width:42px; height:42px; border-radius:50%; background: radial-gradient(circle at 30% 30%, #334155, #0b1220); display:inline-flex; align-items:center; justify-content:center; color:#cbd5e1; font-weight:700; border:1px solid rgba(148,163,184,.25); cursor:pointer;}
+/* Profile pill button */
+.profile-pill{
+  display:inline-flex; align-items:center; gap:8px;
+  background:#0b1324; color:var(--text);
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:999px; padding:6px 10px;
+  cursor:pointer; user-select:none;
+  transition:.15s border, .15s transform, .15s box-shadow;
+}
+.profile-pill:hover{
+  transform: translateY(-1px);
+  border-color: rgba(56,189,248,.45);
+  box-shadow:0 0 0 6px var(--ring);
+}
+.profile-pill:focus{
+  outline:none;
+  border-color: rgba(56,189,248,.65);
+  box-shadow:0 0 0 6px var(--ring);
+}
+.profile-pill .avatar{ width:28px; height:28px; border-radius:50%; }
+.profile-pill .profile-text{ font-size:13px; color:#cbd5e1; }
+.profile-pill .chev{ font-size:14px; opacity:.75; }
+@media (max-width: 480px){ .profile-pill .profile-text{ display:none; } }
+
+/* أنيميشن فتح المودال */
+@keyframes popIn {
+  from { opacity:0; transform: translateY(8px) scale(.98); }
+  to   { opacity:1; transform: none; }
+}
+/* نفعّل الأنيميشن لما نضيف الكلاس show */
+.modal.show .inner{
+  animation: popIn .22s ease-out;
+  transform-origin: top right;
+}
+
+
+    .grid{ display:grid; gap:16px; grid-template-columns: 1fr; }
+    @media (min-width:980px){ .grid{ grid-template-columns: .9fr 1.1fr; } }
+
+    .card{background: var(--card); border:1px solid rgba(148,163,184,.12); border-radius: var(--radius); box-shadow: var(--shadow);}
+
+    .hero{ position:relative; overflow:hidden; padding:24px; background:
+        radial-gradient(1200px 420px at 110% -80%, rgba(34,197,94,.16) 0%, transparent 60%),
+        radial-gradient(1000px 420px at -20% -140%, rgba(56,189,248,.16) 0%, transparent 60%),
+        var(--card);
+    }
+    .hero-head{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px}
+    .pill{ display:inline-flex; gap:8px; align-items:center; border:1px solid rgba(148,163,184,.18); border-radius:999px; padding:6px 10px; background:#0b1324; color:#cbd5e1; font-size:13px;}
+    .hello{font-size:14px; color:var(--muted)}
+    .balance-wrap{display:grid; place-items:center; text-align:center; padding:8px 0 12px}
+    .big{ margin:6px 0 6px; font-size:52px; font-weight:900; letter-spacing:.4px; line-height:1; }
+    .big small{font-size:.5em; color:var(--muted); font-weight:700; margin-inline-start:8px}
+    .subnote{color:var(--muted); font-size:12px}
+
+    .actions{ display:grid; gap:10px; grid-template-columns: 1fr; margin-top:16px }
+    @media(min-width:560px){ .actions{ grid-template-columns: 1fr 1fr; } }
+
+    .btn{ background:#0b1324; border:1px solid rgba(148,163,184,.15); padding:12px 14px; border-radius:12px; color:var(--text); display:flex; gap:10px; align-items:center; justify-content:center; cursor:pointer; user-select:none; transition:.15s transform, .15s border;}
+    .btn:hover{ transform: translateY(-1px); border-color: rgba(56,189,248,.35);}
+    .btn svg{opacity:.9}
+    .btn.primary{ background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color:#062b1a; border-color:transparent; font-weight:800;}
+    .btn.warn{ background: linear-gradient(135deg, #f97316 0%, var(--warning) 100%); color:#3a2202; border-color:transparent; font-weight:800;}
+    .btn.ghost{ background: rgba(148,163,184,.06); }
+
+    .row-compact{ display:grid; gap:10px; grid-template-columns: 1fr; margin-top:6px}
+    @media(min-width:760px){ .row-compact{ grid-template-columns: 1fr 1fr 1fr; } }
+
+    .side{ padding:18px; }
+
+    .activity{ padding:18px; margin-top:16px }
+
+    .foot{ margin-top:16px; text-align:center; color:var(--muted); font-size:12px}
+    .link{color:#7dd3fc; text-decoration:none}
+
+    .mini{ font-size:12px; color:var(--muted) }
+.muted{ color: var(--muted); font-size: 13px; }
+    .pc-box{ display:grid; gap:10px; grid-template-columns: 1fr; }
+    .pc-code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; letter-spacing: 2px; font-weight:800; padding:10px; border-radius:10px; border:1px dashed #334155; background:#0b1324; text-align:center }
+    .btn-mini{ padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:#0b1324; color: var(--text); cursor:pointer }
+    .btn-mini.primary{ background:linear-gradient(135deg, var(--primary), var(--primary-2)); color:#062b1a; border:none; font-weight:700 }
+
+    /* Modals */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(2,6,23,.6); z-index:1000}
+    /* خلي مودال النجاح فوق الجميع */
+    #modal-success{ z-index:1100 !important; }
+    .modal .inner{ width:92%; max-width:560px; background:#0f172a; border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow); }
+    .modal .head{ display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border)}
+    .modal .head h4{ margin:0; font-size:16px; color:#cbd5e1 }
+    .modal .body{ padding:16px; display:grid; gap:12px; color:var(--muted) }
+    .xbtn{ background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:10px; padding:6px 10px; cursor:pointer }
+    .btn-line{ display:flex; gap:10px; flex-wrap:wrap }
+
+    /* Service Points */
+    .sp-grid { display: grid; gap: 16px; }
+    .sp-card { position:relative; background: var(--card); border:1px solid var(--border); border-radius:14px; padding:14px 14px 10px 14px; box-shadow:0 2px 8px rgba(0,0,0,.08); cursor:pointer; transition:border .15s,box-shadow .15s;}
+    .sp-title-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;}
+    .badge { background: var(--primary); color: #062b1a; font-size:12px; border-radius:999px; padding:2px 10px; font-weight:700; }
+    .badge-open  { background:#22c55e; color:#062b1a; }
+.badge-closed{ background:#ef4444; color:#fff; }
+    .sp-hours { color: var(--muted); font-size:13px; margin-bottom:2px;}
+    .sp-address { color: var(--muted); font-size:12px; margin-bottom:6px;}
+    .sp-btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;}
+    .sp-btns .btn-mini { font-size:13px }
+    .sp-card.selected{ border-color: rgba(56,189,248,.55); box-shadow:0 0 0 4px var(--ring); }
+    .sp-card .sp-check { position:absolute;top:8px;left:8px;background:#22c55e;color:#062b1a;font-size:13px;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(34,197,94,.18);z-index:2; }
+    .sp-card .sp-closed { position:absolute;top:8px;right:8px;background:#ef4444;color:#fff;font-size:12px;border-radius:8px;padding:2px 8px;z-index:2; }
+    @media (max-width:600px){
+      #modal-points .btn-mini.primary, #modal-point-details .btn-mini.primary { width:100%; margin-top:8px;}
+      #modal-points .btn-mini, #modal-point-details .btn-mini { width:100%; }
+      #modal-points .btn-line, #modal-point-details .btn-line { flex-direction:column; gap:6px;}
+    }
+
+    /* ===== Virtual Card (elegant) ===== */
+    .vcard-wrap{display:grid; gap:12px;}
+    .vcard{
+      position:relative;
+      border-radius:20px;
+      padding:18px;
+        /* نسبة بطاقة حقيقية تقريبًا 1.586 */
+  aspect-ratio: 1.986;
+  min-height: 0; /* نلغي المين-هايت السابقة */
+  display:flex; flex-direction:column; justify-content:space-between;
+  background: radial-gradient(120% 140% at -10% -10%, rgba(255,255,255,.08), transparent 40%),
+              radial-gradient(120% 140% at 120% 120%, rgba(56,189,248,.16), transparent 40%),
+              linear-gradient(135deg, #0b1530 0%, #1b2a55 45%, #233b7a 100%);
+  border:1px solid rgba(148,163,184,.18);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.04);
+  overflow:hidden;
+
+    }
+    .vcard::after{
+      content:""; position:absolute; inset:0;
+      background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,.06) 35%, transparent 36% 100%);
+      pointer-events:none;
+    }
+    .vcard-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+    .vcard-chip{width:36px; height:28px; border-radius:6px; background:linear-gradient(135deg,#facc15,#f59e0b); opacity:.9; box-shadow:0 2px 8px rgba(0,0,0,.25)}
+    .vcard-brand{font-weight:800; letter-spacing:.5px; color:#e2e8f0}
+    .vcard-number{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:20px; letter-spacing:2px; color:#f1f5f9}
+    .vcard-bottom{display:flex; align-items:flex-end; justify-content:space-between}
+    .vcard-name{font-size:12px; color:#cbd5e1; letter-spacing:.5px}
+    .vcard-exp{font-size:12px; color:#cbd5e1}
+    @media (max-width:480px){
+  .vcard-number{ font-size:18px; }
+}
+    .vcard-badge{
+      position:absolute; top:10px; right:10px;
+      background:rgba(148,163,184,.18); color:#e5e7eb; border:1px solid rgba(148,163,184,.28);
+      padding:3px 8px; border-radius:999px; font-size:11px; backdrop-filter: blur(4px);
+    }
+    .helper-box{
+      background:#0b1324; border:1px solid rgba(148,163,184,.15); border-radius:12px; padding:12px; display:grid; gap:8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Notification bar -->
+<div id="notif-bar" style="display:none;position:fixed;top:0;inset-inline:0;background:#22c55e;color:#062b1a;padding:10px 20px;text-align:center;font-weight:700;z-index:2000;box-shadow:0 4px 12px rgba(0,0,0,.4)"></div>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <h1>Floosy</h1>
+      </div>
+      <button id="profile-pill" class="profile-pill" title="الملف الشخصي">
+  <span class="avatar" id="profile-initials"></span>
+  <span class="profile-text">الملف الشخصي</span>
+  <span class="chev">▾</span>
+</button>
+
+
+
+    </header>
+
+    <div class="grid">
+      <!-- الجانب: بطاقة افتراضية بدل "بيانات حسابي" -->
+      <aside class="card side">
+        <div class="vcard-wrap">
+          <div class="vcard">
+            <div class="vcard-top">
+              <div class="vcard-chip"></div>
+              <div class="vcard-brand">Floosy</div>
+            </div>
+            <div class="vcard-number">XXXX XXXX XXXX XXXX</div>
+            <div class="vcard-bottom">
+              <div class="vcard-name">CARDHOLDER</div>
+              <div class="vcard-exp">XX/XX</div>
+            </div>
+            <div class="vcard-badge">قيد التطوير</div>
+          </div>
+
+          <!-- تحت الكرت: دليل سريع بسيط -->
+          <div class="helper-box">
+            <div class="mini">🔹 للتعبئة: اضغط <b>تعبئة</b> واختر أقرب نقطة خدمة لإظهار PIN.</div>
+            <div class="mini">🔹 للدفع أونلاين: اضغط <b>دفع أونلاين</b>، حدّد المبلغ بالدولار، ثم تواصل معنا على واتساب لاستلام البطاقة.</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- اللوحة الرئيسية -->
+      <section class="card hero">
+        <div class="hero-head">
+          <div class="hello" id="greeting">مرحبًا</div>
+          <span class="pill"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="#7dd3fc" d="M12 1l3 7h7l-5.5 4l2.5 7l-7-4.5L5 19l2.5-7L2 8h7z"/></svg> حساب LY</span>
+        </div>
+
+        <div class="balance-wrap">
+          <div class="big latin" id="balance">0.00 <small>LYD</small></div>
+          <div id="pending-badge" style="display:none;margin-top:6px; font-size:13px; color:#fecaca; background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.35); padding:4px 10px; border-radius:999px">
+            معلّق: <b class="latin" id="pending-total">0.00</b> LYD
+          </div>
+          <div class="subnote">آخر تحديث يظهر تلقائيًا بعد أي عملية.</div>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" data-action="topup">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M11 14H5v-4h6V5l7 7l-7 7z"/></svg>
+            تعبئة
+          </button>
+          <button class="btn warn" data-action="withdraw">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="m12 19l-7-7l7-7v6h6v2h-6z"/></svg>
+            سحب
+          </button>
+        </div>
+
+        <div class="row-compact">
+          <button class="btn ghost" data-action="transfer">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M5 7v2h14V7zm0 4v2h10v-2zm0 4v2h14v-2z"/></svg>
+            إرسال إلى حساب
+          </button>
+          <button class="btn ghost" data-action="pay-online">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#38bdf8" d="M3 4h18v2H3zm0 7h18v2H3zm0 7h18v2H3z"/></svg>
+            دفع أونلاين
+          </button>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+            <button class="btn" data-action="buy-usdt">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 1l3 7h7l-5.5 4l2.5 7l-7-4.5L5 19l2.5-7L2 8h7z"/></svg>
+              شراء USDT
+            </button>
+            <button class="btn" data-action="sell-usdt">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#f97316" d="M12 1l3 7h7l-5.5 4l2.5 7l-7-4.5L5 19l2.5-7L2 8h7z"/></svg>
+              بيع USDT
+            </button>
+          </div>
+        </div>
+
+        <!-- رقم حساب الشحن -->
+        <div class="card" style="margin-top:14px; padding:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <h3 style="margin:0">رقم حساب الشحن</h3>
+            <span class="badge" style="background:var(--primary);color:#062b1a">مجّانًا</span>
+          </div>
+          <div class="pc-box" style="margin-top:8px">
+            <div id="acc-number" class="pc-code">—</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn-mini" id="acc-copy">نسخ الرقم</button>
+            </div>
+            <div class="mini">أبرز هذا الرقم عند زيارة نقطة الخدمة.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="card activity">
+      <h3>نشاط الحساب</h3>
+      <div id="tx-empty" class="muted">لا توجد عمليات بعد.</div>
+      <div id="tx-list" class="list"></div>
+    </div>
+
+    <div class="foot">© Floosy — تجربة أولية. <a class="link" href="/login.html">تبديل الحساب</a> — <a class="link" href="/services.html">الخدمات</a></div>
+  </div>
+<!-- مودال الملف الشخصي -->
+<div class="modal" id="modal-profile">
+  <div class="inner">
+    <div class="head">
+      <h4>الملف الشخصي</h4>
+      <button class="xbtn" data-close="profile">إغلاق</button>
+    </div>
+    <div class="body">
+      <!-- ملخّص الحساب (قراءة فقط) -->
+      <div class="section">
+        <h3 style="margin:0 0 6px; font-size:14px; color:var(--muted)">ملخّص الحساب</h3>
+        <div class="list" style="margin-bottom:8px">
+          <div class="item"><div class="l"><span class="tag">الاسم</span><span id="prof-name">—</span></div></div>
+          <div class="item"><div class="l"><span class="tag">الهاتف</span><span class="latin" id="prof-phone">—</span></div></div>
+          <div class="item"><div class="l"><span class="tag">البريد</span><span id="prof-email">—</span>
+            <span id="prof-email-badge" class="badge" style="margin-inline-start:8px; display:none"></span>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- رقم حساب الشحن (نسخ) -->
+      <div class="section">
+        <h3 style="margin:0 0 6px; font-size:14px; color:var(--muted)">رقم حساب الشحن (LY)</h3>
+        <div class="pc-box">
+          <div id="prof-acc" class="pc-code">—</div>
+          <div>
+            <button class="btn-mini" id="prof-acc-copy">نسخ الرقم</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- تغيير كلمة المرور -->
+      <div class="section">
+        <h3 style="margin:6px 0; font-size:14px; color:var(--muted)">تغيير كلمة المرور</h3>
+        <input id="pw-old" type="password" placeholder="كلمة المرور الحالية" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)" />
+        <input id="pw-new" type="password" placeholder="كلمة المرور الجديدة" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)" />
+        <input id="pw-new2" type="password" placeholder="تأكيد كلمة المرور الجديدة" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)" />
+        <div id="pw-msg" class="mini" style="min-height:14px"></div>
+        <div class="btn-line" style="justify-content:flex-end">
+          <button class="btn-mini" data-close="profile">إلغاء</button>
+          <button class="btn-mini primary" id="pw-save">حفظ</button>
+        </div>
+      </div>
+
+      <!-- تسجيل الخروج -->
+      <div class="section">
+        <h3 style="margin:6px 0; font-size:14px; color:var(--muted)">جلسة الدخول</h3>
+        <button class="btn-mini danger" id="prof-logout">تسجيل الخروج</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- مودال USDT -->
+  <div class="modal" id="modal-usdt">
+    <div class="inner">
+      <div class="head">
+        <h4 id="usdt-title">عملية USDT</h4>
+        <button class="xbtn" data-close="usdt">إغلاق</button>
+      </div>
+      <div class="body">
+        <div>هذه العملية تتم عبر واتساب مع الإدارة.</div>
+        <div>ساعات العمل: <b>9:00 — 18:00</b></div>
+        <div class="btn-line">
+          <a class="btn-mini primary" id="wa-usdt-open" target="_blank" rel="noopener">فتح واتساب</a>
+          <button class="btn-mini" data-close="usdt">إلغاء</button>
+        </div>
+        <div class="mini" id="usdt-note"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- تحويل — الخطوة 1: إدخال رقم الحساب + معاينة -->
+<div class="modal" id="modal-transfer-1">
+  <div class="inner">
+    <div class="head">
+      <h4>إرسال إلى حساب</h4>
+      <button class="xbtn" data-close="t1">إغلاق</button>
+    </div>
+    <div class="body">
+      <label class="mini">رقم حساب المستفيد (من تطبيق Floosy)</label>
+      <input id="t1-account" type="text" placeholder="مثال: LY-XXXX-XXXX" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)" />
+      <div id="t1-err" class="mini" style="color:#ef4444"></div>
+
+      <div id="t1-preview" style="display:none;background:#0b1324;border:1px solid var(--border);border-radius:12px;padding:12px">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+    <div>
+      <div class="mini" style="opacity:.9">المستفيد</div>
+      <div id="t1-name" style="font-weight:800; font-size:15px; margin-top:2px">—</div>
+      <div class="mini" style="margin-top:2px">الهاتف (آخر رقمين): <b id="t1-last2">—</b></div>
+    </div>
+    <div style="font-size:18px">👤</div>
+  </div>
+</div>
+
+
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <input id="t1-save" type="checkbox" />
+        حفظ هذا المستفيد (اختياري)
+      </label>
+      <input id="t1-nick" type="text" placeholder="اسم مستعار (اختياري)" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text);display:none" />
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+        <button class="btn-mini" data-close="t1">إلغاء</button>
+        <button class="btn-mini primary" id="t1-next" disabled>التالي</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- تحويل — الخطوة 2: المبلغ + تأكيد -->
+<div class="modal" id="modal-transfer-2">
+  <div class="inner">
+    <div class="head">
+      <h4>تأكيد التحويل</h4>
+      <button class="xbtn" data-close="t2">إغلاق</button>
+    </div>
+    <div class="body">
+      <div class="mini">المستفيد:</div>
+      <div id="t2-name" style="font-weight:700">—</div>
+      <div class="mini">رقم الحساب: <span class="latin" id="t2-acc">—</span></div>
+
+      <label class="mini" style="margin-top:8px">المبلغ (LYD)</label>
+      <input id="t2-amt" type="number" min="0" placeholder="0.00" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)" />
+      <div class="mini">رصيدك المتاح: <b class="latin" id="t2-bal">0.00</b> LYD</div>
+      <div id="t2-err" class="mini" style="color:#ef4444"></div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+        <button class="btn-mini" id="t2-back">رجوع</button>
+        <button class="btn-mini primary" id="t2-send" disabled>إرسال</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- مودال PIN -->
+  <div class="modal" id="modal-pin">
+    <div class="inner">
+      <div class="head">
+        <h4 id="pin-title">كود التأكيد (PIN)</h4>
+        <button class="xbtn" data-close="pin">إغلاق</button>
+      </div>
+      <div class="body">
+        <div class="mini" id="pin-location">—</div>
+        <div class="mini">هذا الكود من 6 أرقام ويُنتهي بعد مدة قصيرة.</div>
+        <div id="pin-value" class="pc-code" style="font-size:22px">—</div>
+        <div class="mini" id="pin-exp">—</div>
+        <div class="btn-line">
+          <button class="btn-mini primary" id="pin-refresh">توليد/تحديث PIN</button>
+          <button class="btn-mini" data-close="pin">تم</button>
+        </div>
+        <div class="mini">أبرز رقم الحساب + هذا الكود لموظّف نقطة الخدمة.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال قائمة النقاط (الخطوة 1) -->
+  <div class="modal" id="modal-points">
+    <div class="inner">
+      <div class="head">
+        <h4 id="points-title">اختر نقطة خدمة</h4>
+        <button class="xbtn" data-close="points">إغلاق</button>
+      </div>
+      <div class="body">
+        <div style="display:grid;gap:8px">
+          <select id="sp-city" style="padding:10px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)"></select>
+          <select id="sp-type" style="padding:10px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text)">
+            <option value="all">كل الخدمات</option>
+            <option value="topup">تعبئة</option>
+            <option value="withdraw">سحب</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px">
+            <input id="sp-open-now" type="checkbox" />
+            إظهار المفتوحة الآن فقط
+          </label>
+        </div>
+        <div id="sp-empty" class="mini" style="margin-top:6px;display:none">لا توجد نقاط مطابقة.</div>
+        <div id="sp-list" class="sp-grid" style="margin-top:8px;max-height:340px;overflow-y:auto"></div>
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:8px;align-items:center">
+  <div id="points-hint" class="mini" style="color:#ef4444;display:none">المحل مغلق الآن</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-mini" data-close="points">إلغاء</button>
+    <button class="btn-mini primary" id="points-next" disabled>التالي</button>
+  </div>
+</div>
+
+        <div class="mini">رسوم الخدمة: <b>مجّانًا</b> في جميع النقاط.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال تفاصيل النقطة (الخطوة 2) -->
+  <div class="modal" id="modal-point-details">
+    <div class="inner">
+      <div class="head">
+        <h4 id="details-title">تفاصيل النقطة</h4>
+        <button class="xbtn" id="details-close">إغلاق</button>
+      </div>
+      <div class="body">
+        <!-- رقم الحساب داخل التفاصيل -->
+        <div id="details-acc-wrap" class="mini" style="display:none;margin-bottom:6px">
+          رقم الحساب: <span class="latin" id="details-acc">—</span>
+          <button class="btn-mini" id="details-acc-copy" style="margin-inline-start:6px">نسخ</button>
+        </div>
+        <div style="font-size:17px;font-weight:700;margin-bottom:4px" id="details-name">—</div>
+        <div style="margin-bottom:6px">
+          <span id="details-status" class="mini"></span>
+          <span id="details-hours" class="mini" style="margin-inline-start:10px"></span>
+        </div>
+        <div style="margin-bottom:10px">
+          <span class="mini">العنوان:</span>
+          <span id="details-address" style="font-size:14px;"></span>
+
+        </div>
+        <div class="btn-line" style="margin-bottom:10px">
+          <a class="btn-mini" id="details-call" target="_blank">☎️ اتصال</a>
+          <button class="btn-mini" id="details-map">📍 افتح في الخرائط</button>
+          <button class="btn-mini" id="details-copy">📋 نسخ العنوان</button>
+        </div>
+        <div class="mini" id="details-note" style="color:#ef4444"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;align-items:center">
+          <button class="btn-mini" id="details-back">رجوع</button>
+          <button class="btn-mini primary" id="details-pin" disabled>إظهار PIN للتعبئة</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال شراء أونلاين (الإدخال) -->
+  <div class="modal" id="modal-buy-online">
+    <div class="inner">
+      <div class="head">
+        <h4>شراء أونلاين</h4>
+        <button class="xbtn" data-close="buy-online">إغلاق</button>
+      </div>
+      <div class="body">
+  <!-- تعليمات أولية -->
+  <div id="bo-instr" class="helper-box">
+  <!-- رسمة عربة بسيطة -->
+  <div style="display:flex; align-items:center; gap:10px;">
+    <svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="M7 18a2 2 0 1 0 0 4a2 2 0 0 0 0-4m10 0a2 2 0 1 0 0 4a2 2 0 0 0 0-4M7.16 14h9.54a2 2 0 0 0 1.92-1.49l1.38-5.52A1 1 0 0 0 19 5H6.21l-.3-1.2A1 1 0 0 0 5 3H3v2h1.24l2.35 9.39A2.99 2.99 0 0 0 7.16 14Z"/>
+    </svg>
+    <div style="font-weight:700;color:#e5e7eb">كيف تتم عملية الشراء أونلاين؟</div>
+  </div>
+
+  <ol style="margin:6px 0 0 18px; padding:0; line-height:1.8">
+    <li>🙋‍♂️ <b>جهّز السلة</b> في موقع الشراء (مثال: أمازون أو المتجر) حتى يظهر <b>السعر النهائي</b> بعد الشحن/الضرائب.</li>
+    <li>🧮 اكتب هنا <b>نفس السعر النهائي بالدولار</b> بالضبط. إذا كان أقل/أكثر قد تُلغى العملية تلقائيًا.</li>
+    <li>💬 اضغط “التالي” للتواصل عبر واتساب، ونرسل لك <b>بطاقة لمرة واحدة</b> للدفع.</li>
+  </ol>
+
+  <div class="btn-line" style="justify-content:flex-end;margin-top:6px">
+    <button class="btn-mini primary" id="bo-gotit">فهمت، متابعة</button>
+  </div>
+</div>
+
+  <!-- إدخال المبلغ + تفاصيل التسعير -->
+  <div id="bo-inputs" style="display:none">
+    <label class="mini">المبلغ بالدولار (USD)</label>
+    <input id="bo-usd" type="number" min="0" step="0.01" placeholder="مثال: 90" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:#0b1324;color:var(--text);outline:none" />
+    <div class="mini">رصيدك: <b class="latin" id="bo-balance">0.00</b> LYD</div>
+
+    <!-- تفصيل التسعير -->
+    <div class="helper-box">
+      <div class="mini">سعر الصرف + الهامش: <b class="latin" id="bo-rate">—</b> LYD لكل 1 USD</div>
+      <div class="mini">القيمة قبل العمولة: <b class="latin" id="bo-sub">0.00</b> LYD</div>
+      <div class="mini">العمولة: <b class="latin" id="bo-fee">0.00</b> LYD</div>
+      <div class="mini">الإجمالي المستحق: <b class="latin" id="bo-total">0.00</b> LYD</div>
+    </div>
+
+    <div class="mini" id="bo-note" style="color:#f59e0b"></div>
+    <div class="btn-line" style="justify-content:flex-end">
+      <button class="btn-mini" data-close="buy-online">إلغاء</button>
+      <button class="btn-mini primary" id="bo-next" disabled>التالي</button>
+    </div>
+    <div class="mini">الحد الأدنى للطلب: <b>10 LYD</b>. سيتم تثبيت السعر لمدّة ساعة عند المتابعة.</div>
+  </div>
+</div>
+
+
+  <!-- مودال التعليمات -->
+  <div class="modal" id="modal-buy-instructions">
+    <div class="inner">
+      <div class="head">
+        <h4>التعليمات</h4>
+        <button class="xbtn" data-close="buy-instructions">إغلاق</button>
+      </div>
+      <div class="body">
+        <div id="bo-summary" class="mini">—</div>
+        <div class="mini">الرجاء التواصل عبر واتساب خلال <b id="bo-count">60:00</b> دقيقة لاستلام البطاقة الافتراضية.</div>
+        <div class="btn-line" style="justify-content:flex-end">
+          <a class="btn-mini primary" id="bo-wa" target="_blank" rel="noopener">فتح واتساب</a>
+          <button class="btn-mini" data-close="buy-instructions">تم</button>
+        </div>
+        <div class="mini" style="color:#94a3b8">إن لم يتم التواصل خلال الوقت المحدد، سيتم إلغاء الطلب تلقائيًا دون خصم.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== إعدادات عامة =====
+    const ADMIN_WHATSAPP = "218931220947";
+
+    // ===== أدوات Cookie/CSRF والطلبات =====
+    function getCookie(name) {
+      const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+    function getCsrfToken() {
+      return getCookie('csrf_token') || '';
+    }
+    async function apiFetch(url, opts = {}) {
+      opts = opts || {};
+      opts.credentials = 'include';
+      opts.headers = opts.headers || {};
+      if (opts.method && opts.method.toUpperCase() !== 'GET') {
+        opts.headers['X-CSRF-Token'] = getCsrfToken();
+      }
+      return fetch(url, opts);
+    }
+
+    // ===== Utilities UI =====
+    function toAsciiDigits(s){
+      const d = { '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9' };
+      return String(s||'').replace(/[٠-٩۰-۹]/g, ch => d[ch] || ch);
+    }
+    function fmt(n){ const x=Number(n||0); return x.toLocaleString('en-GB',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+    function fmtDate(iso){
+      if(!iso) return '';
+      const d=new Date(iso); if(isNaN(d)) return iso;
+      return d.toLocaleString('en-GB',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    }
+   function initAvatar(name){
+  const parts = String(name||'').trim().split(/\s+/).filter(Boolean);
+  const initials = ((parts[0]?.[0]||'') + (parts[1]?.[0]||'')).toUpperCase() || '🙂';
+  const avNew = document.getElementById('profile-initials');
+  if (avNew) avNew.textContent = initials;
+  const avOld = document.getElementById('avatar'); // احتياط لو موجود
+  if (avOld) avOld.textContent = initials;
+}
+
+function openModalById(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'flex';
+  // أنيميشن
+  el.classList.add('show');
+}
+function closeModalById(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'none';
+  el.classList.remove('show');
+}
+// ===== ملف شخصي (مودال) =====
+function fillProfileModal(){
+  const u = window.__ME || {};
+  document.getElementById('prof-name').textContent  = u.full_name || '—';
+  document.getElementById('prof-phone').textContent = (u.phone || '—');
+  document.getElementById('prof-email').textContent = u.email || '—';
+
+  // بادج تفعيل البريد إن كان عندك الحقل من /me
+  const badge = document.getElementById('prof-email-badge');
+  if (badge){
+    const verified = Number(u.email_verified) === 1;
+    badge.textContent = verified ? 'مفعّل ✅' : 'غير مفعّل';
+    badge.style.display = u.email ? '' : 'none';
+    badge.style.background = verified ? 'var(--primary)' : 'rgba(148,163,184,.18)';
+    badge.style.color = verified ? '#062b1a' : '#e5e7eb';
+    badge.style.borderColor = verified ? 'transparent' : 'rgba(148,163,184,.28)';
+  }
+
+  // رقم الحساب من الذاكرة التي تعبّئها loadAccountNumber()
+  const acc = (window.__ACC_NUMBER || document.getElementById('acc-number')?.textContent || '').trim();
+  const accEl = document.getElementById('prof-acc');
+  if (accEl) accEl.textContent = acc || '—';
+}
+
+function openProfileModal(){
+  fillProfileModal();
+  openModalById('modal-profile');
+}
+
+// نسخ رقم الحساب من مودال الملف الشخصي
+function bindProfileOnce(){
+  const copyBtn = document.getElementById('prof-acc-copy');
+  if (copyBtn && !copyBtn.__bound){
+    copyBtn.addEventListener('click', ()=>{
+      const t = (document.getElementById('prof-acc')?.textContent || '').trim();
+      if (!t || t==='—') return;
+      navigator.clipboard?.writeText(t);
+      const prev = copyBtn.textContent;
+      copyBtn.textContent = 'تم النسخ ✅';
+      copyBtn.disabled = true;
+      setTimeout(()=>{ copyBtn.textContent = prev; copyBtn.disabled = false; }, 1200);
+    });
+    copyBtn.__bound = true;
+  }
+
+  // حفظ كلمة المرور
+  const saveBtn = document.getElementById('pw-save');
+  if (saveBtn && !saveBtn.__bound){
+    saveBtn.addEventListener('click', saveNewPassword);
+    saveBtn.__bound = true;
+  }
+
+  // إغلاق
+  document.querySelectorAll('[data-close="profile"]').forEach(b=>{
+    if (!b.__bound){
+      b.addEventListener('click', ()=> closeModalById('modal-profile'));
+      b.__bound = true;
+    }
+  });
+
+  // تسجيل الخروج
+  const logoutBtn = document.getElementById('prof-logout');
+  if (logoutBtn && !logoutBtn.__bound){
+    logoutBtn.addEventListener('click', doLogout);
+    logoutBtn.__bound = true;
+  }
+}
+
+async function saveNewPassword(){
+  const msg = document.getElementById('pw-msg');
+  const oldv = document.getElementById('pw-old').value || '';
+  const newv = document.getElementById('pw-new').value || '';
+  const new2 = document.getElementById('pw-new2').value || '';
+
+  msg.style.color = '#fca5a5'; // أحمر
+  msg.textContent = '';
+
+  if (!oldv || !newv || !new2){ msg.textContent = 'املأ كل الحقول'; return; }
+  if (newv.length < 8){ msg.textContent = 'كلمة المرور الجديدة قصيرة (8+ حروف)'; return; }
+  if (newv !== new2){ msg.textContent = 'التأكيد لا يطابق الجديدة'; return; }
+
+  try{
+    const r = await apiFetch('/change-password', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ current_password: oldv, new_password: newv })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok){ msg.textContent = d.error || 'تعذّر التغيير'; return; }
+
+    msg.style.color = '#86efac'; // أخضر
+    msg.textContent = 'تم تغيير كلمة المرور بنجاح ✅';
+    document.getElementById('pw-old').value = '';
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-new2').value = '';
+  }catch{
+    msg.textContent = 'تعذّر الاتصال';
+  }
+}
+
+async function doLogout(){
+  try{
+    await apiFetch('/logout', { method:'POST' });
+  }finally{
+    window.location.href = '/login.html';
+  }
+}
+
+    // ===== إرسال إلى حساب (برقم الحساب) =====
+const TSTATE = {
+  account: '',
+  display_name: '',
+  phone_hint: '',
+  save: false,
+  nickname: ''
+};
+
+function openTransfer1(){
+  // reset
+  TSTATE.account = '';
+  TSTATE.display_name = '';
+  TSTATE.phone_hint = '';
+  TSTATE.save = false;
+  TSTATE.nickname = '';
+
+  document.getElementById('t1-account').value = '';
+  document.getElementById('t1-err').textContent = '';
+  document.getElementById('t1-preview').style.display = 'none';
+  document.getElementById('t1-save').checked = false;
+  document.getElementById('t1-nick').style.display = 'none';
+  document.getElementById('t1-nick').value = '';
+  document.getElementById('t1-next').disabled = true;
+
+  openModalById('modal-transfer-1');
+}
+
+async function doLookup(){
+  const acc = (document.getElementById('t1-account').value || '').trim().toUpperCase();
+  const err = document.getElementById('t1-err');
+  const prev = document.getElementById('t1-preview');
+  const next = document.getElementById('t1-next');
+  err.textContent = '';
+  prev.style.display = 'none';
+  next.disabled = true;
+  if (acc.length < 4){ err.textContent = 'أدخل رقم حساب صحيح'; return; }
+
+  try{
+    const r = await apiFetch('/account-lookup', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ account: acc })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok){ err.textContent = d.error || 'فشل التحقق'; return; }
+
+    TSTATE.account = d.account;
+    TSTATE.display_name = d.display_name || 'مستخدم';
+    TSTATE.phone_hint = d.phone_hint || '';
+    document.getElementById('t1-name').textContent = TSTATE.display_name;
+    document.getElementById('t1-last2').textContent = TSTATE.phone_hint;
+
+    prev.style.display = '';
+    next.disabled = false;
+  }catch{
+    err.textContent = 'تعذّر الاتصال';
+  }
+}
+
+function goTransfer2(){
+  closeModalById('modal-transfer-1');
+  document.getElementById('t2-name').textContent = TSTATE.display_name;
+  document.getElementById('t2-acc').textContent  = TSTATE.account;
+  document.getElementById('t2-amt').value = '';
+  document.getElementById('t2-err').textContent = '';
+  document.getElementById('t2-bal').textContent = fmt(window.__ME?.balance || 0);
+  document.getElementById('t2-send').disabled = true;
+  openModalById('modal-transfer-2');
+}
+
+function validateAmt(){
+  const v = Number(document.getElementById('t2-amt').value || 0);
+  const err = document.getElementById('t2-err');
+  const btn = document.getElementById('t2-send');
+  err.textContent = '';
+  btn.disabled = true;
+  if (!(v > 0)){ err.textContent = 'أدخل مبلغًا صحيحًا'; return; }
+  if ((window.__ME?.balance || 0) < v){ err.textContent = 'الرصيد لا يكفي'; return; }
+  btn.disabled = false;
+}
+
+async function submitTransfer(){
+  const amt = Number(document.getElementById('t2-amt').value || 0);
+  const err = document.getElementById('t2-err');
+  err.textContent = '';
+  const save = document.getElementById('t1-save').checked;
+  const nickname = (document.getElementById('t1-nick').value || '').trim();
+
+  try{
+    const r = await apiFetch('/transfer-account', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        account: TSTATE.account,
+        amount: amt,
+        save: !!save,
+        nickname
+      })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok){ err.textContent = d.error || 'فشل التحويل'; return; }
+
+    // أغلق خطوة التأكيد فورًا
+    closeModalById('modal-transfer-2');
+
+    // ✅ أعرض النجاح فورًا (قبل أي تحميلات) حتى ما يرتبط بـ"شراء أونلاين"
+    setTimeout(()=>{
+  showSuccess('تم التحويل بنجاح ✅');
+  showNotif('✅ تم التحويل بنجاح');
+}, 0);
+
+
+    // حدّث البيانات في الخلفية بدون تعطيل الواجهة
+    Promise.allSettled([ loadMe(), loadTx() ]);
+
+  }catch{
+    err.textContent = 'تعذّر الاتصال';
+  }
+}
+
+    // ===== الجلسة والبيانات =====
+    async function loadMe(){
+      try {
+        const r = await apiFetch('/me');
+        if (r.status === 401) { location.href = "/login.html"; return; }
+        if (!r.ok) { alert('تعذر جلب الحساب'); return; }
+        const u = await r.json();
+        applyUser(u);
+        await loadTx();
+        await loadPending();
+        await loadAccountNumber();
+      } catch {
+        location.href = "/login.html";
+      }
+    }
+    function applyUser(u){
+      document.getElementById('greeting').textContent = "مرحبًا، " + (u.full_name?.split(' ')[0] || '');
+      document.getElementById('balance').innerHTML = fmt(u.balance) + ' <small>LYD</small>';
+      initAvatar(u.full_name);
+      window.__ME = u;
+    }
+
+    // ===== النشاط والطلبات المعلقة =====
+    async function loadTx(){
+      const list = document.getElementById('tx-list');
+      const empty = document.getElementById('tx-empty');
+      list.innerHTML = ''; empty.style.display = 'block';
+      try{
+        const r = await apiFetch('/transactions');
+        if(!r.ok) return;
+        const data = await r.json();
+        const items = data.items || [];
+        if(items.length === 0) return;
+        empty.style.display = 'none';
+        for(const t of items){
+          const meta = (()=>{ try{ return JSON.parse(t.meta||'{}'); }catch{ return {}; }})();
+
+          const badge = (type)=>{
+            if(type==='transfer_in')  return '<span class="tag">وارد</span>';
+            if(type==='transfer_out') return '<span class="tag">صادر</span>';
+            if(type==='admin_adj')    return '<span class="tag">تعديل إداري</span>';
+            if(type==='topup')        return '<span class="tag">تعبئة</span>';
+            if(type==='withdraw')     return '<span class="tag">سحب</span>';
+            return '<span class="tag">عملية</span>';
+          };
+          const hint = meta.from ? `من ${toAsciiDigits(meta.from)}` : (meta.to ? `إلى ${toAsciiDigits(meta.to)}` : (meta.via ? `(${meta.via})` : ''));
+          const row = document.createElement('div');
+row.className = 'tx-item';
+row.innerHTML = `
+  <div class="tx-left">
+    ${badge(t.type)}
+    <div class="tx-time latin">${fmtDate(t.created_at)}</div>
+    ${hint?`<div class="mini" style="margin-inline-start:6px">${hint}</div>`:''}
+  </div>
+  <div class="latin tx-amt">${fmt(t.amount)} LYD</div>
+`;
+list.appendChild(row);
+        }
+        // إشعار للعملية الأحدث
+if (items && items.length > 0) {
+  const latest = items[0]; // أول عملية
+  const lastId = window.__LAST_TX_ID || 0;
+  if (latest.id && latest.id !== lastId) {
+    window.__LAST_TX_ID = latest.id;
+    let msg = '';
+    if (latest.type === 'topup')       msg = '✅ تمت التعبئة بنجاح';
+    else if (latest.type === 'withdraw') msg = '✅ تم السحب بنجاح';
+    else if (latest.type === 'transfer_in')  msg = '✅ تم استلام تحويل';
+    else if (latest.type === 'transfer_out') msg = '✅ تم التحويل بنجاح';
+    else                                     msg = '✅ عملية جديدة';
+    showNotif(msg);
+  }
+}
+
+      }catch{}
+    }
+
+    async function loadPending(){
+      try{
+        const r = await apiFetch('/my-requests');
+        if(!r.ok) return;
+        const d = await r.json().catch(()=>({items:[]}));
+        const items = d.items || [];
+        const total = items
+          .filter(it => String(it.status||'').toLowerCase()==='pending')
+          .reduce((s,it)=> s + Number(it.amount||0), 0);
+        const box = document.getElementById('pending-badge');
+        const el  = document.getElementById('pending-total');
+        if(total > 0){ el.textContent = fmt(total); box.style.display='inline-block'; }
+        else { box.style.display='none'; }
+      }catch{}
+    }
+
+    // ===== رقم حساب الشحن =====
+    async function loadAccountNumber() {
+      const el = document.getElementById('acc-number');
+      try {
+        const r = await apiFetch('/account-number');
+        const d = await r.json().catch(()=>({}));
+        if (r.ok && d.account_number) {
+          el.textContent = d.account_number;
+          window.__ACC_NUMBER = d.account_number;
+        } else {
+          el.textContent = '—';
+        }
+      } catch {
+        el.textContent = '—';
+      }
+    }
+    (function bindAccountNumberUI(){
+      const copyBtn = document.getElementById('acc-copy');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+          const t = (document.getElementById('acc-number').textContent||'').trim();
+          if (!t || t==='—') return;
+          navigator.clipboard?.writeText(t);
+          const prev = copyBtn.textContent;
+          copyBtn.textContent = 'تم النسخ ✅';
+          copyBtn.disabled = true;
+          setTimeout(()=>{ copyBtn.textContent = prev; copyBtn.disabled = false; }, 1200);
+        });
+      }
+    })();
+
+    // ===== PIN countdown (2 min) — FRONTEND ONLY =====
+    let PIN_EXPIRES_AT = 0;
+    let PIN_TIMER = null;
+
+    function stopPinCountdown(){
+      if (PIN_TIMER){ clearInterval(PIN_TIMER); PIN_TIMER = null; }
+    }
+    function startPinCountdown(expiresAtIso){
+      stopPinCountdown();
+      PIN_EXPIRES_AT = new Date(expiresAtIso).getTime();
+      const refBtn = document.getElementById('pin-refresh');
+      if (refBtn){ refBtn.disabled = true; refBtn.textContent = 'PIN فعّال'; }
+      updatePinCountdown();
+      PIN_TIMER = setInterval(updatePinCountdown, 1000);
+    }
+    function updatePinCountdown(){
+      const expEl = document.getElementById('pin-exp');
+      if (!expEl) return;
+      const remainMs = PIN_EXPIRES_AT - Date.now();
+      if (remainMs > 0){
+        const totalSec = Math.ceil(remainMs / 1000);
+        const m = Math.floor(totalSec / 60);
+        const s = String(totalSec % 60).padStart(2,'0');
+        expEl.textContent = `ينتهي خلال: ${m}:${s}`;
+      } else {
+        expEl.textContent = 'انتهى — أعد التوليد';
+        stopPinCountdown();
+        const refBtn = document.getElementById('pin-refresh');
+        if (refBtn){ refBtn.disabled = false; refBtn.textContent = 'توليد/تحديث PIN'; }
+      }
+    }
+
+    // ===== PIN (إنشاء/عرض) =====
+    function openPinModal() {
+      openModalById('modal-pin');
+      loadTopupPin();
+    }
+    async function loadTopupPin() {
+      const v = document.getElementById('pin-value');
+      const exp = document.getElementById('pin-exp');
+      const refBtn = document.getElementById('pin-refresh');
+      if (v) v.textContent = '—';
+      if (exp) exp.textContent = '';
+      stopPinCountdown();
+      try {
+        const r = await apiFetch('/topup-pin');
+        const d = await r.json().catch(()=>({}));
+        if (r.ok && d.pin) {
+          if (v) v.textContent = d.pin;
+          startPinCountdown(d.expires_at);
+        } else {
+          if (exp) exp.textContent = 'لا يوجد PIN فعّال حاليًا.';
+          if (refBtn){ refBtn.disabled = false; refBtn.textContent = 'توليد/تحديث PIN'; }
+        }
+      } catch {
+        if (exp) exp.textContent = 'تعذّر الجلب';
+        if (refBtn){ refBtn.disabled = false; refBtn.textContent = 'توليد/تحديث PIN'; }
+      }
+    }
+    async function genTopupPin() {
+      const v = document.getElementById('pin-value');
+      const exp = document.getElementById('pin-exp');
+      const refBtn = document.getElementById('pin-refresh');
+      try {
+        const r = await apiFetch('/topup-pin/new', { method:'POST' });
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) {
+          stopPinCountdown();
+          if (exp) exp.textContent = d.error || 'فشل إنشاء PIN';
+          if (refBtn){ refBtn.disabled = false; refBtn.textContent = 'توليد/تحديث PIN'; }
+          return;
+        }
+        if (v) v.textContent = d.pin || '—';
+        startPinCountdown(d.expires_at);
+      } catch {
+        stopPinCountdown();
+        if (exp) exp.textContent = 'تعذّر الاتصال';
+        if (refBtn){ refBtn.disabled = false; refBtn.textContent = 'توليد/تحديث PIN'; }
+      }
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      const refBtn = document.getElementById('pin-refresh');
+      if (refBtn) refBtn.addEventListener('click', genTopupPin);
+      document.querySelectorAll('[data-close="pin"]').forEach(b => b.addEventListener('click', ()=> closeModalById('modal-pin')));
+    });
+    // تحويل: ربط إدخال الحساب + الأزرار
+const t1acc = document.getElementById('t1-account');
+if (t1acc){
+  t1acc.addEventListener('blur', doLookup);
+  t1acc.addEventListener('keyup', (e)=>{ if (e.key==='Enter') doLookup(); });
+}
+document.getElementById('t1-save')?.addEventListener('change', (e)=>{
+  document.getElementById('t1-nick').style.display = e.currentTarget.checked ? '' : 'none';
+});
+document.getElementById('t1-next')?.addEventListener('click', goTransfer2);
+document.querySelectorAll('[data-close="t1"]').forEach(b => b.addEventListener('click', ()=> closeModalById('modal-transfer-1')));
+
+document.getElementById('t2-amt')?.addEventListener('input', validateAmt);
+document.getElementById('t2-send')?.addEventListener('click', submitTransfer);
+document.getElementById('t2-back')?.addEventListener('click', ()=>{
+  closeModalById('modal-transfer-2');
+  openModalById('modal-transfer-1');
+});
+document.querySelectorAll('[data-close="t2"]').forEach(b => b.addEventListener('click', ()=> closeModalById('modal-transfer-2')));
+
+
+    // ===== تدفّق اختيار نقطة الخدمة =====
+    const UI = { mode: 'topup', selectedPointId: null, filters: { city: '', type: 'all', openOnly: false }, scrollY: 0 };
+
+    function isOpenNow(point) {
+      if (!point.hours) return false;
+      const now = new Date();
+      const [from, to] = point.hours.split('–');
+      if (!from || !to) return false;
+      const [fh, fm] = from.split(':').map(Number);
+      const [th, tm] = to.split(':').map(Number);
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      const fromMins = fh * 60 + fm;
+      const toMins = th * 60 + tm;
+      return nowMins >= fromMins && nowMins <= toMins;
+    }
+
+    const SERVICE_POINTS = [
+      { id:"andulus1", name:"نقطة حي الأندلس — طرابلس", city:"طرابلس", area:"حي الأندلس", address:"طرابلس، حي الأندلس، شارع الخدمات بجوار السوق", phone:"0912345678", hours:"09:00–18:00", services:["topup","withdraw"], lat:32.8723, lng:13.1833 },
+      { id:"gargaresh1", name:"نقطة قرقارش — طرابلس", city:"طرابلس", area:"قرقارش", address:"طرابلس، قرقارش، شارع البحر بجانب محطة الوقود", phone:"0923456789", hours:"10:00–17:00", services:["topup"], lat:32.8850, lng:13.1510 },
+      { id:"souk1", name:"نقطة سوق الجمعة — طرابلس", city:"طرابلس", area:"سوق الجمعة", address:"طرابلس، سوق الجمعة، شارع المدارس أمام مدرسة النور", phone:"0945678912", hours:"08:30–15:30", services:["withdraw"], lat:32.8942, lng:13.2321 }
+    ];
+
+    function renderPointsList() {
+      const city = document.getElementById('sp-city')?.value || UI.filters.city;
+      const type = document.getElementById('sp-type')?.value || UI.filters.type;
+      const openOnly = document.getElementById('sp-open-now')?.checked || UI.filters.openOnly;
+      UI.filters = { city, type, openOnly };
+
+      let filtered = SERVICE_POINTS.filter(pt => pt.city === city);
+      if (type !== 'all') filtered = filtered.filter(pt => pt.services.includes(type));
+      if (openOnly) filtered = filtered.filter(isOpenNow);
+
+      const cont = document.getElementById('sp-list');
+      const empty = document.getElementById('sp-empty');
+      cont.innerHTML = '';
+
+      if (!filtered.length) {
+        if (empty) empty.style.display='';
+        document.getElementById('points-next').disabled = true;
+        return;
+      }
+      if (empty) empty.style.display='none';
+
+      let foundSelected = false;
+      filtered.forEach(pt => {
+        const isSelected = pt.id === UI.selectedPointId;
+        const open = isOpenNow(pt);
+        const card = document.createElement('div');
+        card.className = 'sp-card' + (isSelected ? ' selected' : '');
+        card.innerHTML = `
+  <div class="sp-title-row">
+    <span>${pt.name}</span>
+    <span>
+      <span class="badge">
+        ${pt.services.includes('topup') && pt.services.includes('withdraw') ? 'كل الخدمات' : (pt.services.includes('topup') ? 'تعبئة' : 'سحب')}
+      </span>
+      <span class="badge ${open ? 'badge-open':'badge-closed'}" style="margin-inline-start:6px">
+        ${open ? 'مفتوح':'مغلق'}
+      </span>
+    </span>
+  </div>
+  <div class="sp-hours">ساعات العمل: ${pt.hours}</div>
+  <div class="sp-address">${pt.address}</div>
+  <div class="sp-btns">
+    <button class="btn-mini" data-map="${pt.lat},${pt.lng}">📍 افتح في الخرائط</button>
+    <a class="btn-mini" href="tel:${pt.phone}">☎️ اتصال</a>
+    <button class="btn-mini" data-copy="${pt.address}">📋 نسخ العنوان</button>
+    <button class="btn-mini primary" data-select>اختيار</button>
+  </div>
+`;
+
+        card.querySelector('[data-map]').onclick = () => window.open(`https://www.google.com/maps?q=${pt.lat},${pt.lng}`,'_blank');
+        card.querySelector('[data-copy]').onclick = (e) => {
+          const btn = e.currentTarget; navigator.clipboard.writeText(pt.address);
+          const t = btn.textContent; btn.textContent='تم النسخ ✅'; btn.disabled=true;
+          setTimeout(()=>{btn.textContent=t; btn.disabled=false;}, 1200);
+        };
+        card.querySelector('[data-select]').onclick = () => {
+          UI.selectedPointId = pt.id;
+          renderPointsList();
+          document.getElementById('points-next').disabled = !isOpenNow(pt);
+          const hint = document.getElementById('points-hint');
+if (hint) hint.style.display = isOpenNow(pt) ? 'none' : '';
+
+        };
+        cont.appendChild(card);
+        if (isSelected) foundSelected = true;
+      });
+
+      if (!foundSelected) {
+        UI.selectedPointId = null;
+        document.getElementById('points-next').disabled = true;
+      }
+      const hint = document.getElementById('points-hint');
+if (hint) hint.style.display = 'none';
+
+      setTimeout(() => { cont.scrollTop = UI.scrollY || 0; }, 0);
+    }
+
+    function openChoosePointModal(mode) {
+      UI.mode = mode;
+      UI.selectedPointId = null;
+
+      const citySel = document.getElementById('sp-city');
+      if (citySel) {
+        const cities = Array.from(new Set(SERVICE_POINTS.map(p => p.city)));
+        citySel.innerHTML = cities.map(c => `<option value="${c}">${c}</option>`).join('');
+        UI.filters.city = cities[0] || '';
+        citySel.value = UI.filters.city;
+      }
+      const typeSel = document.getElementById('sp-type');
+      if (typeSel) { typeSel.value = mode; UI.filters.type = mode; }
+
+      const chk = document.getElementById('sp-open-now');
+      if (chk) { chk.checked = false; UI.filters.openOnly = false; }
+
+      UI.scrollY = 0;
+      renderPointsList();
+      document.getElementById('points-title').textContent = mode === 'topup' ? 'اختر نقطة خدمة للتعبئة' : 'اختر نقطة خدمة للسحب';
+      document.getElementById('points-next').textContent = 'التالي';
+      document.getElementById('points-next').disabled = true;
+      openModalById('modal-points');
+    }
+
+    function goToDetails() {
+      const pt = SERVICE_POINTS.find(p => p.id === UI.selectedPointId);
+      if (!pt) return;
+      closeModalById('modal-points');
+
+      // رقم الحساب في التفاصيل
+      const acc = (window.__ACC_NUMBER || document.getElementById('acc-number')?.textContent || '').trim();
+      const wrapAcc = document.getElementById('details-acc-wrap');
+      const accEl   = document.getElementById('details-acc');
+      const accCopy = document.getElementById('details-acc-copy');
+      if (acc && acc !== '—') {
+        if (wrapAcc) wrapAcc.style.display = '';
+        if (accEl) accEl.textContent = acc;
+        if (accCopy) {
+          accCopy.onclick = function(){
+            navigator.clipboard?.writeText(acc);
+            const t = accCopy.textContent;
+            accCopy.textContent = 'تم النسخ ✅';
+            accCopy.disabled = true;
+            setTimeout(()=>{ accCopy.textContent = t; accCopy.disabled = false; }, 1200);
+          };
+        }
+      } else {
+        if (wrapAcc) wrapAcc.style.display = 'none';
+      }
+
+      document.getElementById('details-title').textContent = 'تفاصيل النقطة';
+      document.getElementById('details-name').textContent = pt.name;
+      const open = isOpenNow(pt);
+      document.getElementById('details-status').textContent = open ? 'مفتوح الآن ✅' : 'مغلق ❌';
+      document.getElementById('details-status').style.color = open ? '#22c55e' : '#ef4444';
+      document.getElementById('details-hours').textContent = 'ساعات العمل: ' + pt.hours;
+      document.getElementById('details-address').textContent = pt.address;
+      document.getElementById('details-call').href = 'tel:' + pt.phone;
+      document.getElementById('details-map').onclick = () => window.open(`https://www.google.com/maps?q=${pt.lat},${pt.lng}`,'_blank');
+      document.getElementById('details-copy').onclick = function() {
+        navigator.clipboard.writeText(pt.address);
+        const prev = this.textContent;
+        this.textContent = 'تم النسخ ✅';
+        this.disabled = true;
+        setTimeout(()=>{ this.textContent = '📋 نسخ العنوان'; this.disabled = false; }, 1200);
+      };
+      document.getElementById('details-note').textContent = open ? '' : 'النقطة مغلقة الآن';
+      const pinBtn = document.getElementById('details-pin');
+      pinBtn.textContent = UI.mode === 'topup' ? 'إظهار PIN للتعبئة' : 'إظهار PIN للسحب';
+      pinBtn.disabled = !open;
+
+      openModalById('modal-point-details');
+    }
+
+    function backToList() {
+      closeModalById('modal-point-details');
+      renderPointsList();
+      openModalById('modal-points');
+    }
+
+    function openPinFromDetails() {
+      closeModalById('modal-point-details');
+      const pt = SERVICE_POINTS.find(p => p.id === UI.selectedPointId);
+      document.getElementById('pin-title').textContent = UI.mode === 'topup' ? 'كود التأكيد (PIN) — تعبئة' : 'كود التأكيد (PIN) — سحب';
+      document.getElementById('pin-location').textContent = pt ? 'الموقع المختار: ' + pt.name : '';
+      openModalById('modal-pin');
+      loadTopupPin();
+    }
+
+    // ===== شراء أونلاين (تسعير + تدفّق) =====
+    const FX_RATE = 5.40;      // سعر صرف تقريبي
+    const FX_SPREAD = 0.025;   // هامش
+    const FEE_PCT = 0.03;      // عمولة نسبية
+    const FEE_FIX = 0.00;      // عمولة ثابتة
+    const MIN_LY = 10;         // حد أدنى بالـ LYD
+    let BO_TIMER = null;
+    let BO_UNTIL = 0;
+
+    function computeTotalLYD(usd){
+      let ly = Number(usd||0) * FX_RATE;
+      ly *= (1 + FX_SPREAD);
+      ly = ly * (1 + FEE_PCT) + FEE_FIX;
+      return Math.ceil(ly * 100) / 100;
+    }
+
+    function openBuyOnline(){
+  clearInterval(BO_TIMER); BO_TIMER = null; BO_UNTIL = 0;
+  const bal = Number(window.__ME?.balance || 0);
+  document.getElementById('bo-balance').textContent = fmt(bal);
+
+  // إظهار التعليمات أولًا
+  document.getElementById('bo-instr').style.display  = '';
+  document.getElementById('bo-inputs').style.display = 'none';
+
+  // تصفير الحقول
+  const usdEl = document.getElementById('bo-usd');
+  if (usdEl) usdEl.value = '';
+  document.getElementById('bo-rate').textContent  = '—';
+  document.getElementById('bo-sub').textContent   = '0.00';
+  document.getElementById('bo-fee').textContent   = '0.00';
+  document.getElementById('bo-total').textContent = '0.00';
+  document.getElementById('bo-note').textContent  = '';
+  document.getElementById('bo-next').disabled     = true;
+
+  openModalById('modal-buy-online');
+}
+
+
+    function startBuyCountdown(minutes = 60){
+      clearInterval(BO_TIMER); BO_TIMER = null;
+      BO_UNTIL = Date.now() + minutes*60*1000;
+      const el = document.getElementById('bo-count');
+      const tick = ()=>{
+        const remain = BO_UNTIL - Date.now();
+        if (remain <= 0){ el.textContent = '00:00'; clearInterval(BO_TIMER); BO_TIMER=null; return; }
+        const total = Math.ceil(remain/1000);
+        const m = Math.floor(total/60);
+        const s = String(total%60).padStart(2,'0');
+        el.textContent = `${String(m).padStart(2,'0')}:${s}`;
+      };
+      tick();
+      BO_TIMER = setInterval(tick, 1000);
+    }
+
+    function closeBuyModals(){
+      closeModalById('modal-buy-online');
+      closeModalById('modal-buy-instructions');
+      clearInterval(BO_TIMER); BO_TIMER=null; BO_UNTIL=0;
+    }
+
+    // ربط الأحداث
+    document.addEventListener('DOMContentLoaded', function(){
+      // إغلاق نافذة النجاح
+document.getElementById('success-ok')?.addEventListener('click', ()=> closeModalById('modal-success'));
+document.getElementById('modal-success')?.addEventListener('click', (e)=>{
+  if (e.target.id === 'modal-success') closeModalById('modal-success');
+});
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape') closeModalById('modal-success');
+});
+
+      // إجراءات رئيسية
+      document.querySelectorAll('[data-action="topup"]').forEach(b=> b.addEventListener('click', ()=> openChoosePointModal('topup')));
+      document.querySelectorAll('[data-action="topup-quick"]').forEach(b=> b.addEventListener('click', ()=> openChoosePointModal('topup')));
+      document.querySelectorAll('[data-action="withdraw"]').forEach(b=> b.addEventListener('click', ()=> openChoosePointModal('withdraw')));
+      document.querySelectorAll('[data-action="withdraw-quick"]').forEach(b=> b.addEventListener('click', ()=> openChoosePointModal('withdraw')));
+      document.querySelectorAll('[data-action="transfer"]').forEach(b=> b.addEventListener('click', openTransfer1));
+
+      // دفع أونلاين
+      document.querySelector('[data-action="pay-online"]')?.addEventListener('click', openBuyOnline);
+      document.querySelectorAll('[data-close="buy-online"]').forEach(b=> b.addEventListener('click', closeBuyModals));
+      document.querySelectorAll('[data-close="buy-instructions"]').forEach(b=> b.addEventListener('click', closeBuyModals));
+
+      const usdInput = document.getElementById('bo-usd');
+const rateEl   = document.getElementById('bo-rate');
+const subEl    = document.getElementById('bo-sub');
+const feeEl    = document.getElementById('bo-fee');
+const totalEl  = document.getElementById('bo-total');
+const noteEl   = document.getElementById('bo-note');
+const nextBtn  = document.getElementById('bo-next');
+
+// زر "فهمت، متابعة"
+document.getElementById('bo-gotit')?.addEventListener('click', ()=>{
+  document.getElementById('bo-instr').style.display  = 'none';
+  document.getElementById('bo-inputs').style.display = '';
+});
+
+function computeQuote(usd){
+  const rateEff = FX_RATE * (1 + FX_SPREAD);
+  const subLyd  = Math.max(0, Number(usd||0)) * rateEff;
+  const feeLyd  = subLyd * FEE_PCT + FEE_FIX;
+  const total   = subLyd + feeLyd;
+  return { rateEff, subLyd, feeLyd, total, usd:Number(usd||0), feePct:FEE_PCT };
+}
+
+
+function updateBuyBreakdown(){
+  const usd = Number(usdInput.value || 0);
+  const q = computeQuote(usd);
+
+  rateEl.textContent  = fmt(q.rateEff);
+  subEl.textContent   = fmt(q.subLyd);
+  feeEl.textContent   = fmt(q.feeLyd);
+  totalEl.textContent = fmt(q.total);
+
+  const bal = Number(window.__ME?.balance || 0);
+  let valid = true;
+  noteEl.textContent = '';
+  if (!Number.isFinite(usd) || usd <= 0) valid = false;
+  if (q.total < MIN_LY){ valid = false; noteEl.textContent = 'الحد الأدنى للطلب 10 LYD.'; }
+  if (q.total > bal){ valid = false; noteEl.textContent = 'الرصيد غير كافٍ لهذه العملية.'; }
+  nextBtn.disabled = !valid;
+}
+
+usdInput?.addEventListener('input', updateBuyBreakdown);
+
+
+      nextBtn?.addEventListener('click', ()=>{
+        const usd = Number(usdInput.value || 0);
+        const q = computeQuote(usd);
+        const total = q.total;
+        const phone = window.__ME?.phone || '';
+        const summary = `المبلغ: ${usd.toFixed(2)} USD\nالإجمالي التقريبي: ${fmt(total)} LYD\nالحساب: ${phone}`;
+        document.getElementById('bo-summary').textContent = summary.replace(/\n/g,' · ');
+        const msg = `مرحبًا، أريد بطاقة شراء أونلاين.\nالمبلغ: ${usd.toFixed(2)} USD\nالإجمالي: ${fmt(total)} LYD\nهاتف الحساب: ${phone}\nالمهلة: 60 دقيقة.`;
+        document.getElementById('bo-wa').href = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+        closeModalById('modal-buy-online');
+        openModalById('modal-buy-instructions');
+        startBuyCountdown(60);
+      });
+
+      // فلاتر النقاط
+      document.getElementById('sp-city')?.addEventListener('change', renderPointsList);
+      document.getElementById('sp-type')?.addEventListener('change', renderPointsList);
+      document.getElementById('sp-open-now')?.addEventListener('change', renderPointsList);
+
+      // التالي في قائمة النقاط
+      document.getElementById('points-next')?.addEventListener('click', function(){
+        UI.scrollY = document.getElementById('sp-list').scrollTop;
+        goToDetails();
+      });
+
+      // تفاصيل النقطة
+      document.getElementById('details-back')?.addEventListener('click', backToList);
+      document.getElementById('details-close')?.addEventListener('click', ()=> closeModalById('modal-point-details'));
+      document.getElementById('details-pin')?.addEventListener('click', openPinFromDetails);
+
+      // إغلاق مودال النقاط
+      document.querySelectorAll('[data-close="points"]').forEach(b => b.addEventListener('click', ()=> closeModalById('modal-points')));
+
+// الملف الشخصي: افتح المودال
+document.getElementById('profile-pill')?.addEventListener('click', ()=>{
+  openProfileModal();
+  bindProfileOnce();
+});
+
+      // (اختياري) خليه احتياط لو نسيت تغييره بمكان ثاني
+      document.getElementById('avatar')?.addEventListener('click', ()=> openProfile());
+
+      // USDT
+      document.querySelector('[data-action="buy-usdt"]')?.addEventListener('click', ()=> openUSDTModal('شراء USDT'));
+      document.querySelector('[data-action="sell-usdt"]')?.addEventListener('click', ()=> openUSDTModal('بيع USDT'));
+      document.querySelectorAll('[data-close="usdt"]').forEach(b => b.addEventListener('click', ()=> closeModalById('modal-usdt')));
+
+      // تحميل البيانات
+      loadMe();
+    });
+
+    // ملف شخصي بسيط
+    function openProfile(){
+      alert('الاسم: ' + (window.__ME?.full_name||'—') + '\nالهاتف: ' + (window.__ME?.phone||'—'));
+    }
+
+    // مودال USDT (واتساب)
+    function openUSDTModal(kind){
+      document.getElementById('usdt-title').textContent = kind || 'عملية USDT';
+      const amt = Number(document.getElementById('quickAmount')?.value || 0);
+      const txt = `مرحبًا، أريد ${kind||'USDT'} بقيمة ${amt>0? amt + ' LYD':''} — حسابي: ${window.__ME?.phone||''}`;
+      const url = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(txt)}`;
+      const a = document.getElementById('wa-usdt-open');
+      a.href = url;
+      document.getElementById('usdt-note').textContent = 'سيتم فتح واتساب للتواصل مباشرة.';
+      openModalById('modal-usdt');
+    }
+    // ===== إشعار نجاح عام =====
+function showSuccess(msg){
+  const txt = document.getElementById('success-text');
+  if (txt) txt.textContent = msg || 'تمت العملية بنجاح ✅';
+  openModalById('modal-success');
+}
+// ===== Notification bar =====
+function showNotif(msg, type='success'){
+  const bar = document.getElementById('notif-bar');
+  if(!bar) return;
+  bar.textContent = msg;
+  if(type==='error'){
+    bar.style.background = '#ef4444';  // أحمر
+    bar.style.color = '#fff';
+  } else {
+    bar.style.background = '#22c55e';  // أخضر
+    bar.style.color = '#062b1a';
+  }
+  bar.style.display = 'block';
+  setTimeout(()=>{ bar.style.display='none'; }, 3500);
+}
+
+  </script>
+  
+  <!-- مودال نجاح عام -->
+
+  <script src="/scripts/dashboard.js" defer></script>
+</body>
+</html>
