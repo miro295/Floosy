@@ -25,6 +25,13 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 5000;
 // مدة صلاحية PIN بالثواني (2 دقيقة)
 const TOPUP_PIN_TTL_SEC = 120;
 
+// ----- OTP/PIN Security (new) -----
+const OTP_CODE_TTL_SEC = 120;                 // OTP validity: 2 minutes
+const OTP_SEND_DAILY_MAX = 10;                // max OTP sends per email/day
+const OTP_VERIFY_DAILY_WRONG_MAX = 100;       // max wrong OTP verifies per email+IP/day
+const OTP_SEND_COOLDOWN_SEC_DEFAULT = 60;     // resend cooldown (most flows)
+const OTP_SEND_COOLDOWN_SEC_FORGOT_PW = 120;  // resend cooldown for forgot-password
+
 // ====== Security & Config ======
 const JWT_SECRET = process.env.JWT_SECRET || "CHANGE_ME_SUPER_SECRET_KEY";
 if (JWT_SECRET === "CHANGE_ME_SUPER_SECRET_KEY") {
@@ -331,6 +338,8 @@ const ensureColumn = (table, column, type) => {
   });
 };
 ensureColumn('users', 'pin_hash', 'TEXT');
+ensureColumn('users', 'pin_fail_count', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn('users', 'pin_reset_required', 'INTEGER NOT NULL DEFAULT 0');
 
 // ====== Utils ======
 const isLibyanPhone = (p) => /^0(91|92|93|94)\d{7}$/.test(String(p || "").trim());
@@ -343,6 +352,7 @@ function cleanStr(s) {
 }
 const nowISO = () => new Date().toISOString();
 const addMinutesISO = (mins) => new Date(Date.now() + mins * 60 * 1000).toISOString();
+const addSecondsISO = (sec) => new Date(Date.now() + sec * 1000).toISOString();
 
 async function sendVerifyEmail({ to, name, code, link }) {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
@@ -501,16 +511,34 @@ app.post('/logout', requireUserAuth, requireCsrfIfCookie, (req, res) => {
 
 // POST /check-pin — التأكد من الـPIN أثناء الدخول
 app.post('/check-pin', requireUserAuth, async (req, res) => {
-  const pin = String(req.body.pin || '');
-  if (!/^\d{6}$/.test(pin)) {
-    return res.status(400).json({ error: 'PIN غير صالح' });
-  }
-  db.get(`SELECT pin_hash FROM users WHERE id = ?`, [req.user.id], async (err, row) => {
+  const pin = String(req.body.pin || '').trim();
+  if (!/^\d{6}$/.test(pin)) return res.status(400).json({ error: 'PIN غير صالح' });
+
+  db.get(`SELECT pin_hash, pin_fail_count, pin_reset_required FROM users WHERE id=?`, [req.user.id], async (err, row) => {
     if (err) return res.status(500).json({ error: 'DB error' });
     if (!row || !row.pin_hash) return res.status(400).json({ error: 'لم تقم بتعيين PIN بعد' });
-    const bcryptOk = await bcrypt.compare(pin, row.pin_hash);
-    if (!bcryptOk) return res.status(401).json({ error: 'رمز PIN غير صحيح' });
-    return res.json({ ok: true });
+
+    if (Number(row.pin_reset_required) === 1) {
+      return res.status(423).json({ error: 'تجاوزت الحد. يرجى إعادة تعيين الـ PIN عبر البريد.' });
+    }
+
+    const ok = await bcrypt.compare(pin, row.pin_hash);
+    if (!ok) {
+      const fails = Number(row.pin_fail_count || 0) + 1;
+      if (fails >= 10) {
+        db.run(`UPDATE users SET pin_fail_count=0, pin_reset_required=1 WHERE id=?`, [req.user.id], () => {
+          return res.status(423).json({ error: 'تجاوزت الحد. يرجى إعادة تعيين الـ PIN عبر البريد.' });
+        });
+      } else {
+        db.run(`UPDATE users SET pin_fail_count=? WHERE id=?`, [fails, req.user.id], () => {
+          return res.status(401).json({ error: 'رمز PIN غير صحيح' });
+        });
+      }
+      return;
+    }
+
+    // success
+    db.run(`UPDATE users SET pin_fail_count=0 WHERE id=?`, [req.user.id], () => res.json({ ok: true }));
   });
 });
 
@@ -525,16 +553,24 @@ app.post('/register-send-otp', async (req, res) => {
     if (e) return res.status(500).json({ error: "DB error" });
     if (row) return res.status(409).json({ error: "البريد مستخدم" });
 
+    const emailNorm = String(email).toLowerCase().trim();
+    const cooldownSec = OTP_SEND_COOLDOWN_SEC_DEFAULT;
+    const can = canSendOtp(emailNorm, cooldownSec);
+    if (!can.ok) {
+      return res.json({ ok: true });
+    }
+
     const code = String(crypto.randomInt(100000,999999));
     const now = new Date().toISOString();
-    const expires = addMinutesISO(15);
+    const expires = addSecondsISO(OTP_CODE_TTL_SEC);
     db.run(`INSERT INTO email_verifications (user_id,email,code,expires_at,created_at,used)
             VALUES (0,?,?,?, ?,0)`,
-      [email.toLowerCase(), code, expires, now], async (err2)=>{
+      [emailNorm, code, expires, now], async (err2)=>{
         if(err2) return res.status(500).json({ error: "فشل الإرسال" });
         try{
-          await sendVerifyEmail({to:email,name:"",code,link:""});
+          await sendVerifyEmail({to:emailNorm,name:"",code,link:""});
         } catch{}
+        markSentOtp(can.k, can.rec, can.now);
         return res.json({ ok:true });
       });
   });
@@ -551,11 +587,6 @@ app.post(
 
     const ip = clientIp(req);
 
-    // ✅ قبل ما نتحقق من الكود، تأكدنا من عدد المحاولات
-    if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
-      return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
-    }
-
     db.get(
       `SELECT id, code, expires_at, used
        FROM email_verifications
@@ -565,15 +596,15 @@ app.post(
       [email],
       (err, row) => {
         if (err)   return res.status(500).json({ error: "DB error" });
-        if (!row)  { recordOtpFail(email, ip); return res.status(400).json({ error:"كود غير صالح" }); }
-        if (row.used) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود مستخدم" }); }
-        if (new Date(row.expires_at) < new Date()) { recordOtpFail(email, ip); return res.status(400).json({ error:"انتهت صلاحية الكود" }); }
-        if (row.code !== otp) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود غير صحيح" }); }
+        if (!row || row.used || new Date(row.expires_at) < new Date() || row.code !== otp) {
+          recordOtpWrong(email, ip);
+          return res.status(400).json({ error: "الكود غير صحيح أو منتهي الصلاحية" });
+        }
 
-        // ✅ نجاح → صفّر العداد لليوم
-        resetOtpAttempts(email, ip);
-        // نكتفي بإرجاع ok لأن إنشاء المستخدم وإعداد PIN يكون في خطوة لاحقة عندك
-        return res.json({ ok: true, name: "" });
+        db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id], () => {
+          resetOtpWrong(email, ip);
+          return res.json({ ok: true, name: "" });
+        });
       }
     );
   }
@@ -642,17 +673,23 @@ app.post(
         // Send email verify code (fire-and-forget)
         (async () => {
           try {
+            const emailNorm = email;
+            const cooldownSec = OTP_SEND_COOLDOWN_SEC_DEFAULT;
+            const can = canSendOtp(emailNorm, cooldownSec);
+            if (!can.ok) return;
+
             const code = String(crypto.randomInt(100000, 999999));
             const now = new Date();
-            const expires = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+            const expires = new Date(now.getTime() + OTP_CODE_TTL_SEC * 1000).toISOString();
             const created = now.toISOString();
             db.run(
               `INSERT INTO email_verifications (user_id, email, code, expires_at, created_at, used) VALUES (?, ?, ?, ?, ?, 0)`,
-              [userId, email, code, expires, created],
+              [userId, emailNorm, code, expires, created],
               async (e2) => {
                 if (e2) return console.error("Email code save error:", e2.message);
-                const link = `${APP_BASE_URL}/verify-email?code=${encodeURIComponent(code)}&email=${encodeURIComponent(email)}`;
-                await sendVerifyEmail({ to: email, name: full_name, code, link });
+                const link = `${APP_BASE_URL}/verify-email?code=${encodeURIComponent(code)}&email=${encodeURIComponent(emailNorm)}`;
+                await sendVerifyEmail({ to: emailNorm, name: full_name, code, link });
+                markSentOtp(can.k, can.rec, can.now);
               }
             );
           } catch (e) {
@@ -695,9 +732,7 @@ app.post(
         if (!row) { recordFail(key); return res.status(401).json(invalidMsg); }
         if (Number(row.is_active) !== 1) return res.status(403).json({ error: "الحساب موقوف. تواصل مع الإدارة." });
 
-        let ok = false;
-        if (row.password_hash) ok = await bcrypt.compare(password, row.password_hash);
-        else ok = row.password === password;
+        const ok = row.password_hash ? await bcrypt.compare(password, row.password_hash) : false;
 
         if (!ok) { recordFail(key); return res.status(401).json(invalidMsg); }
 
@@ -727,21 +762,30 @@ app.post(
     const email = String(req.body.email || "").toLowerCase().trim();
     db.get(`SELECT id, full_name FROM users WHERE email = ?`, [email], (e1, u) => {
       if (e1) return res.status(500).json({ error: "خطأ الخادم" });
-      if (!u) return res.status(404).json({ error: "البريد غير مسجّل" });
+      if (!u) { console.log("resend-verify: email not found", email); return res.json({ ok: true }); }
+
+      const emailNorm = email;
+      const cooldownSec = OTP_SEND_COOLDOWN_SEC_DEFAULT;
+      const can = canSendOtp(emailNorm, cooldownSec);
+      if (!can.ok) {
+        return res.json({ ok: true });
+      }
 
       const code = String(crypto.randomInt(100000, 999999));
       const now = new Date();
-      const expires = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+      const expires = new Date(now.getTime() + OTP_CODE_TTL_SEC * 1000).toISOString();
       const created = now.toISOString();
 
       db.run(
         `INSERT INTO email_verifications (user_id, email, code, expires_at, created_at, used)
          VALUES (?, ?, ?, ?, ?, 0)`,
-        [u.id, email, code, expires, created],
+        [u.id, emailNorm, code, expires, created],
         async (e2) => {
           if (e2) return res.status(500).json({ error: "تعذّر حفظ كود جديد" });
-          const link = `${APP_BASE_URL}/verify-email?code=${encodeURIComponent(code)}&email=${encodeURIComponent(email)}`;
-          try { await sendVerifyEmail({ to: email, name: u.full_name, code, link }); } catch {}
+          const link = `${APP_BASE_URL}/verify-email?code=${encodeURIComponent(code)}&email=${encodeURIComponent(emailNorm)}`;
+          try { await sendVerifyEmail({ to: emailNorm, name: u.full_name, code, link }); } catch {}
+                    markSentOtp(can.k, can.rec, can.now);
+          markSentOtp(can.k, can.rec, can.now);
           return res.json({ ok: true });
         }
       );
@@ -770,7 +814,7 @@ app.post(
       [old_email],
       (e1, u) => {
         if (e1) return res.status(500).json({ error: "DB error (lookup old_email)" });
-        if (!u) return res.status(404).json({ error: "الحساب غير موجود للبريد الحالي" });
+        if (!u) { console.log("change-email: old not found", old_email); return res.json({ ok: true }); }
         if (Number(u.email_verified) === 1) {
           return res.status(400).json({ error: "لا يمكن تغيير البريد لحساب مُفعّل" });
         }
@@ -790,20 +834,28 @@ app.post(
               (e3) => {
                 if (e3) return res.status(500).json({ error: "DB error (update email)" });
 
+                const emailNorm = new_email;
+                const cooldownSec = OTP_SEND_COOLDOWN_SEC_DEFAULT;
+                const can = canSendOtp(emailNorm, cooldownSec);
+                if (!can.ok) {
+                  return res.json({ ok: true, email: new_email });
+                }
+
                 const code = String(crypto.randomInt(100000, 999999));
                 const now = new Date();
-                const expires = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+                const expires = new Date(now.getTime() + OTP_CODE_TTL_SEC * 1000).toISOString();
                 const created = now.toISOString();
 
                 db.run(
                   `INSERT INTO email_verifications (user_id, email, code, expires_at, created_at, used)
                    VALUES (?, ?, ?, ?, ?, 0)`,
-                  [u.id, new_email, code, expires, created],
+                  [u.id, emailNorm, code, expires, created],
                   async (e4) => {
                     if (e4) return res.status(500).json({ error: "تعذّر حفظ كود جديد" });
 
-                    const link = `${APP_BASE_URL}/verify-email?code=${encodeURIComponent(code)}&email=${encodeURIComponent(new_email)}`;
-                    try { await sendVerifyEmail({ to: new_email, name: u.full_name, code, link }); } catch {}
+                    const link = `${APP_BASE_URL}/verify-email?code=${encodeURIComponent(code)}&email=${encodeURIComponent(emailNorm)}`;
+                    try { await sendVerifyEmail({ to: emailNorm, name: u.full_name, code, link }); } catch {}
+                    markSentOtp(can.k, can.rec, can.now);
 
                     return res.json({ ok: true, email: new_email });
                   }
@@ -817,17 +869,12 @@ app.post(
   }
 );
 
-app.get("/verify-email", (req, res) => {
+app.get("/verify-email", verifyOtpGuard, (req, res) => {
   const code = String(req.query.code || "").trim();
   const email = String(req.query.email || "").trim().toLowerCase();
   if (!code || !email) return res.status(400).send("رابط غير صالح");
 
   const ip = clientIp(req);
-
-  // تحقق من عدد المحاولات
-  if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
-    return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
-  }
   db.get(
     `SELECT ev.id, ev.user_id, ev.expires_at, ev.used
      FROM email_verifications ev
@@ -836,15 +883,17 @@ app.get("/verify-email", (req, res) => {
     [email, code],
     (err, row) => {
       if (err) return res.status(500).send("خطأ الخادم");
-      if (!row)  { recordOtpFail(email, ip); return res.status(400).json({ error: "الكود غير صحيح" }); }
-      if (row.used) { recordOtpFail(email, ip); return res.status(400).json({ error: "تم استخدام الكود سابقًا" }); }
-      if (new Date(row.expires_at).getTime() < Date.now()) { recordOtpFail(email, ip); return res.status(400).json({ error: "انتهت صلاحية الكود" }); }
+      if (!row || row.used || new Date(row.expires_at).getTime() < Date.now()) {
+        recordOtpWrong(email, ip);
+        return res.status(400).json({ error: "الكود غير صحيح أو منتهي الصلاحية" });
+      }
 
       db.serialize(() => {
         db.run(`UPDATE users SET email_verified = 1 WHERE id = ?`, [row.user_id]);
         db.run(`UPDATE email_verifications SET used = 1 WHERE id = ?`, [row.id]);
       });
 
+      resetOtpWrong(email, ip);
       res.send(`<!doctype html><meta charset="utf-8"/>
         <div style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;background:#0f172a;color:#e5e7eb">
           <div style="background:#111827;border:1px solid rgba(148,163,184,.15);padding:24px;border-radius:12px;text-align:center;max-width:460px">
@@ -856,39 +905,40 @@ app.get("/verify-email", (req, res) => {
     }
   );
 });
-// ====== Login/OTP lock helpers ======
+// ====== Login/OTP lock helpers (updated) ======
 const failedLogins = new Map();
-const OTP_DAILY_MAX = 3;
-const otpVerifyAttempts = new Map(); // key: `${email}|${ip}|${day}` -> count
+
+// Wrong OTP verifies per (email|ip|day)
+const otpWrongAttempts = new Map();
+// OTP sends per (email|day)
+const otpSendCounter  = new Map();
 
 function clientIp(req) {
   const xf = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   return xf || req.ip || req.connection?.remoteAddress || '';
 }
-function otpKey(email, ip) {
-  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  return `${String(email||'').toLowerCase().trim()}|${ip}|${day}`;
+function dayKey(){ return new Date().toISOString().slice(0,10); }
+function keyWrong(email, ip){ return `${String(email||'').toLowerCase().trim()}|${ip}|${dayKey()}`; }
+function keySend(email){ return `${String(email||'').toLowerCase().trim()}|${dayKey()}`; }
+
+function getOtpWrong(email, ip){ return Number(otpWrongAttempts.get(keyWrong(email, ip)) || 0); }
+function recordOtpWrong(email, ip){
+  const k = keyWrong(email, ip);
+  otpWrongAttempts.set(k, getOtpWrong(email, ip) + 1);
 }
-function getOtpAttempts(email, ip) {
-  const k = otpKey(email, ip);
-  return Number(otpVerifyAttempts.get(k) || 0);
+function resetOtpWrong(email, ip){ otpWrongAttempts.delete(keyWrong(email, ip)); }
+
+function canSendOtp(email, cooldownSec){
+  const k = keySend(email);
+  const rec = otpSendCounter.get(k) || { count:0, lastSentAtMs:0 };
+  const now = Date.now();
+  const cooldownOk = (now - rec.lastSentAtMs) >= (cooldownSec*1000);
+  return { ok: rec.count < OTP_SEND_DAILY_MAX && cooldownOk, k, rec, now };
 }
-function recordOtpFail(email, ip) {
-  const k = otpKey(email, ip);
-  otpVerifyAttempts.set(k, getOtpAttempts(email, ip) + 1);
+function markSentOtp(k, rec, now){
+  otpSendCounter.set(k, { count: (rec.count || 0) + 1, lastSentAtMs: now });
 }
-function resetOtpAttempts(email, ip) {
-  otpVerifyAttempts.delete(otpKey(email, ip));
-}
-function verifyOtpGuard(req, res, next) {
-  const email = String(req.body?.email || '').toLowerCase().trim();
-  const ip = clientIp(req);
-  if (!email) return next();
-  if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
-    return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
-  }
-  next();
-}
+
 function checkLock(key) {
   const now = Date.now();
   const rec = failedLogins.get(key);
@@ -905,6 +955,16 @@ function recordFail(key) {
   failedLogins.set(key, rec);
 }
 function recordSuccess(key) { failedLogins.delete(key); }
+
+// Guard before OTP verification (per request)
+function verifyOtpGuard(req, res, next) {
+  const email = String(req.body?.email || req.query?.email || '').toLowerCase().trim();
+  const ip = clientIp(req);
+  if (email && getOtpWrong(email, ip) >= OTP_VERIFY_DAILY_WRONG_MAX) {
+    return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
+  }
+  next();
+}
 
 // ====== Email Verify (POST, JSON) ======
 app.post(
@@ -928,9 +988,10 @@ app.post(
       [email, code],
       (err, row) => {
         if (err)   return res.status(500).json({ error: "خطأ الخادم" });
-        if (!row)  return res.status(400).json({ error: "الكود غير صحيح" });
-        if (row.used) return res.status(400).json({ error: "تم استخدام الكود سابقًا" });
-        if (new Date(row.expires_at).getTime() < Date.now()) return res.status(400).json({ error: "انتهت صلاحية الكود" });
+        if (!row || row.used || new Date(row.expires_at).getTime() < Date.now()) {
+          recordOtpWrong(email, ip);
+          return res.status(400).json({ error: "الكود غير صحيح أو منتهي الصلاحية" });
+        }
 
         const fetchUserAndFinish = (userIdOrNull) => {
           const finishWithUser = (u) => {
@@ -946,7 +1007,7 @@ app.post(
                 setReadableCookie(res, "csrf_token", csrf, { maxAge: 7 * 24 * 60 * 60 * 1000 });
 
                 const needPin = !u.pin_hash;
-                resetOtpAttempts(email, ip);
+                resetOtpWrong(email, ip);
                 return res.json({ ok: true, set_pin: needPin, token, csrf, user: {
                   id: u.id, full_name: u.full_name, phone: u.phone, email: u.email,
                   balance: u.balance, allow_services: u.allow_services, email_verified: u.email_verified
@@ -995,21 +1056,29 @@ app.post("/forgot-password/send-otp", async (req, res) => {
   }
   db.get(`SELECT id, full_name FROM users WHERE email = ?`, [email], async (e, row) => {
     if (e) return res.status(500).json({ error: "DB error" });
-    if (!row) return res.status(404).json({ error: "الحساب غير موجود" });
+    if (!row) { console.log("forgot-password: email not found", email); return res.json({ ok: true }); }
+
+    const emailNorm = email;
+    const cooldownSec = OTP_SEND_COOLDOWN_SEC_FORGOT_PW;
+    const can = canSendOtp(emailNorm, cooldownSec);
+    if (!can.ok) {
+      return res.json({ ok: true });
+    }
 
     const code = String(crypto.randomInt(100000, 999999));
-    const expires = addMinutesISO(15);
+    const expires = addSecondsISO(OTP_CODE_TTL_SEC);
     const created = nowISO();
 
     db.run(
       `INSERT INTO email_verifications (user_id,email,code,expires_at,created_at,used)
        VALUES (?, ?, ?, ?, ?, 0)`,
-      [row.id, email, code, expires, created],
+      [row.id, emailNorm, code, expires, created],
       async (err2) => {
         if (err2) return res.status(500).json({ error: "فشل الإرسال" });
         try {
-          await sendVerifyEmail({ to: email, name: row.full_name, code, link: "" });
+          await sendVerifyEmail({ to: emailNorm, name: row.full_name, code, link: "" });
         } catch {}
+        markSentOtp(can.k, can.rec, can.now);
         return res.json({ ok: true });
       }
     );
@@ -1022,9 +1091,6 @@ app.post('/forgot-pin/verify-otp', verifyOtpGuard, (req,res)=>{
   if (!email || !otp) return res.status(400).json({ error:"بيانات ناقصة" });
 
   const ip = clientIp(req);
-  if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
-    return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
-  }
 
   db.get(
     `SELECT id, code, expires_at, used 
@@ -1034,13 +1100,13 @@ app.post('/forgot-pin/verify-otp', verifyOtpGuard, (req,res)=>{
     [email],
     (err,row)=>{
       if(err) return res.status(500).json({ error:"DB error" });
-      if(!row) { recordOtpFail(email, ip); return res.status(400).json({ error:"كود غير صالح" }); }
-      if(row.used) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود مستخدم" }); }
-      if(new Date(row.expires_at) < new Date()) { recordOtpFail(email, ip); return res.status(400).json({ error:"انتهت صلاحية الكود" }); }
-      if(row.code !== otp) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود غير صحيح" }); }
+      if(!row || row.used || new Date(row.expires_at) < new Date() || row.code !== otp) {
+        recordOtpWrong(email, ip);
+        return res.status(400).json({ error:"الكود غير صحيح أو منتهي الصلاحية" });
+      }
 
       db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id], ()=>{
-        resetOtpAttempts(email, ip);
+        resetOtpWrong(email, ip);
         return res.json({ ok:true });
       });
   });
@@ -1074,50 +1140,66 @@ app.post("/forgot-pin/send-otp", requireUserAuth, async (req, res) => {
   db.get(`SELECT email, full_name FROM users WHERE id=?`, [userId], async (e, u) => {
     if (e || !u) return res.status(400).json({ error: "مستخدم غير موجود" });
 
+    const emailNorm = u.email.toLowerCase();
+    const cooldownSec = OTP_SEND_COOLDOWN_SEC_DEFAULT;
+    const can = canSendOtp(emailNorm, cooldownSec);
+    if (!can.ok) {
+      return res.json({ ok: true });
+    }
+
     const code = String(crypto.randomInt(100000, 999999));
     const now = new Date();
-    const expires = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+    const expires = new Date(now.getTime() + OTP_CODE_TTL_SEC * 1000).toISOString();
     const created = now.toISOString();
 
     db.run(
       `INSERT INTO email_verifications (user_id, email, code, expires_at, created_at, used)
        VALUES (?, ?, ?, ?, ?, 0)`,
-      [userId, u.email, code, expires, created],
+      [userId, emailNorm, code, expires, created],
       async (e2) => {
         if(e2) return res.status(500).json({ error: "تعذر الإرسال" });
-        try{ await sendVerifyEmail({to:u.email,name:u.full_name,code,link:""}) }catch{}
+        try{ await sendVerifyEmail({to:emailNorm,name:u.full_name,code,link:""}) }catch{}
+        markSentOtp(can.k, can.rec, can.now);
         return res.json({ ok:true });
       }
     );
   });
 });
 
-app.post("/forgot-pin/verify", requireUserAuth, async (req,res)=>{
+app.post("/forgot-pin/verify", verifyOtpGuard, requireUserAuth, async (req,res)=>{
   const {otp} = req.body||{};
   db.get(
-    `SELECT id,code,expires_at,used FROM email_verifications
-      WHERE user_id=? ORDER BY id DESC LIMIT 1`, 
+    `SELECT id,email,code,expires_at,used FROM email_verifications
+      WHERE user_id=? ORDER BY id DESC LIMIT 1`,
     [req.user.id], (e,row)=>{
       if(e) return res.status(500).json({error:"DB"});
-      if(!row||row.used) return res.status(400).json({error:"كود غير صالح"});
-      if(row.code!==String(otp)) return res.status(400).json({error:"الكود غير صحيح"});
-      if(new Date(row.expires_at)<new Date()) return res.status(400).json({error:"انتهت صلاحية الكود"});
-      db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id]);
-      res.json({ok:true});
+      const email = String(row?.email || "").toLowerCase();
+      const ip = clientIp(req);
+      if(!row || row.used || row.code!==String(otp) || new Date(row.expires_at)<new Date()) {
+        recordOtpWrong(email, ip);
+        return res.status(400).json({error:"الكود غير صحيح أو منتهي الصلاحية"});
+      }
+      db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id], ()=>{
+        resetOtpWrong(email, ip);
+        res.json({ok:true});
+      });
     });
 });
 
 // ====== Set Login PIN ======
 app.post("/set-pin", requireUserAuth, requireCsrfIfCookie, async (req, res) => {
   const pin = String(req.body.pin || "").trim();
-  if (!/^\d{6}$/.test(pin))
-    return res.status(400).json({ error: "PIN غير صالح" });
+  if (!/^\d{6}$/.test(pin)) return res.status(400).json({ error: "PIN غير صالح" });
 
   const hash = await bcrypt.hash(pin, 10);
-  db.run(`UPDATE users SET pin_hash=? WHERE id=?`, [hash, req.user.id], (err) => {
-    if (err) return res.status(500).json({ error: "تعذّر الحفظ" });
-    res.json({ ok: true });
-  });
+  db.run(
+    `UPDATE users SET pin_hash=?, pin_fail_count=0, pin_reset_required=0 WHERE id=?`,
+    [hash, req.user.id],
+    (err) => {
+      if (err) return res.status(500).json({ error: "تعذّر الحفظ" });
+      res.json({ ok: true });
+    }
+  );
 });
 
 // ====== Basic account APIs ======
@@ -1160,7 +1242,7 @@ app.post("/account-lookup", requireUserAuth, requireCsrfIfCookie, (req, res) => 
     [accNorm],
     (e, row) => {
       if (e) return res.status(500).json({ error: "خطأ الخادم" });
-      if (!row) return res.status(404).json({ error: "الحساب غير موجود" });
+      if (!row) { console.log("forgot-password: email not found", email); return res.json({ ok: true }); }
       if (row.id === req.user.id) return res.status(400).json({ error: "لا يمكنك التحويل لنفسك" });
 
       return res.json({
