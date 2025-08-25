@@ -6,7 +6,7 @@ import cors from "cors";
 import sqlite3 from "sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
-
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
@@ -53,7 +53,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:5000",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5000",
-    "http://localhost:5173",
+  "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
 
@@ -66,7 +66,7 @@ const transporter = nodemailer.createTransport({
 
 // ====== Express base ======
 app.set("trust proxy", 1);
-
+app.use(cookieParser());
 app.use(
   helmet({
     hidePoweredBy: true,
@@ -120,6 +120,14 @@ const authLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
   message: { error: "Too many attempts, try again shortly" },
+});
+// تشديد لطلبات OTP: 3 طلبات/دقيقة لكل IP
+const otpLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "محاولات كثيرة. جرّب بعد دقيقة." },
 });
 
 // ====== Helpers (cookie, csrf, device) ======
@@ -322,7 +330,6 @@ const ensureColumn = (table, column, type) => {
     }
   });
 };
-
 ensureColumn('users', 'pin_hash', 'TEXT');
 
 // ====== Utils ======
@@ -471,7 +478,7 @@ app.get("/admin", (_req, res) => res.sendFile(path.join(__dirname, "public", "ad
 app.get("/admin.html", (_req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 
 // Static AFTER page routes
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public"), { maxAge: "1h", etag: true }));
 
 // ====== Force HTTPS in prod ======
 app.use((req, res, next) => {
@@ -484,23 +491,25 @@ app.use((req, res, next) => {
 });
 
 // ====== User Auth ======
+
+// POST /logout (خارج أي مسار آخر)
+app.post('/logout', requireUserAuth, requireCsrfIfCookie, (req, res) => {
+  setCookie(res, 'floosy_token', '', { maxAge: 0 });
+  setReadableCookie(res, 'csrf_token', '', { maxAge: 0 });
+  res.json({ ok: true });
+});
+
 // POST /check-pin — التأكد من الـPIN أثناء الدخول
 app.post('/check-pin', requireUserAuth, async (req, res) => {
   const pin = String(req.body.pin || '');
   if (!/^\d{6}$/.test(pin)) {
     return res.status(400).json({ error: 'PIN غير صالح' });
   }
-  
-  // جلب الـ pin_hash من قاعدة البيانات
   db.get(`SELECT pin_hash FROM users WHERE id = ?`, [req.user.id], async (err, row) => {
     if (err) return res.status(500).json({ error: 'DB error' });
     if (!row || !row.pin_hash) return res.status(400).json({ error: 'لم تقم بتعيين PIN بعد' });
-    
     const bcryptOk = await bcrypt.compare(pin, row.pin_hash);
-    if (!bcryptOk) {
-      return res.status(401).json({ error: 'رمز PIN غير صحيح' });
-    }
-    
+    if (!bcryptOk) return res.status(401).json({ error: 'رمز PIN غير صحيح' });
     return res.json({ ok: true });
   });
 });
@@ -512,12 +521,10 @@ app.post('/register-send-otp', async (req, res) => {
   if (!isLibyanPhone(phone)) return res.status(400).json({ error: "هاتف غير صالح" });
   if (!isStrongPassword(password)) return res.status(400).json({ error: "كلمة مرور ضعيفة" });
 
-  // فحص إذا موجود مسبقًا
   db.get(`SELECT id FROM users WHERE email=?`, [email.toLowerCase()], (e, row)=>{
     if (e) return res.status(500).json({ error: "DB error" });
     if (row) return res.status(409).json({ error: "البريد مستخدم" });
 
-    // send OTP
     const code = String(crypto.randomInt(100000,999999));
     const now = new Date().toISOString();
     const expires = addMinutesISO(15);
@@ -532,19 +539,46 @@ app.post('/register-send-otp', async (req, res) => {
       });
   });
 });
+
 // ---- Step 2: verify OTP ----
-app.post('/register-verify-otp', (req,res)=>{
-  const { email, otp } = req.body || {};
-  db.get(`SELECT id,code,expires_at,used FROM email_verifications
-          WHERE email=? ORDER BY id DESC LIMIT 1`
-    [email.toLowerCase()], (err,row)=>{
-      if(err) return res.status(500).json({ error:"DB error" });
-      if(!row || row.used) return res.status(400).json({ error:"كود غير صالح" });
-      if(row.code!==String(otp)) return res.status(400).json({ error:"الكود غير صحيح" });
-      if(new Date(row.expires_at) < new Date()) return res.status(400).json({ error:"انتهت صلاحية الكود" });
-      return res.json({ ok:true, name:"" });
-  });
-});
+app.post(
+  '/register-verify-otp',
+  verifyOtpGuard, // ✅ يفحص الحد اليومي حسب (email+IP+اليوم)
+  (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const otp   = String(req.body.otp   || '').trim();
+    if (!email || !otp) return res.status(400).json({ error: "بيانات ناقصة" });
+
+    const ip = clientIp(req);
+
+    // ✅ قبل ما نتحقق من الكود، تأكدنا من عدد المحاولات
+    if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
+      return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
+    }
+
+    db.get(
+      `SELECT id, code, expires_at, used
+       FROM email_verifications
+       WHERE email = ?
+       ORDER BY id DESC
+       LIMIT 1`,
+      [email],
+      (err, row) => {
+        if (err)   return res.status(500).json({ error: "DB error" });
+        if (!row)  { recordOtpFail(email, ip); return res.status(400).json({ error:"كود غير صالح" }); }
+        if (row.used) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود مستخدم" }); }
+        if (new Date(row.expires_at) < new Date()) { recordOtpFail(email, ip); return res.status(400).json({ error:"انتهت صلاحية الكود" }); }
+        if (row.code !== otp) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود غير صحيح" }); }
+
+        // ✅ نجاح → صفّر العداد لليوم
+        resetOtpAttempts(email, ip);
+        // نكتفي بإرجاع ok لأن إنشاء المستخدم وإعداد PIN يكون في خطوة لاحقة عندك
+        return res.json({ ok: true, name: "" });
+      }
+    );
+  }
+);
+
 // ---- Step 3: finish - create user + set PIN ----
 app.post('/register-pin', async (req,res)=>{
   const { email, pin }=req.body||{};
@@ -559,12 +593,12 @@ app.post('/register-pin', async (req,res)=>{
     db.run(`INSERT INTO users(full_name,phone,email,password_hash,balance,created_at,email_verified,is_active) VALUES(?,?,?, ?,0,?,1,1)`,
     ["", phone, email.toLowerCase(), hash, created], function(err2){
       if(err2) return res.status(500).json({ error:"DB" });
-      // تخزين PIN في جدول منفصل لو تحب
       return res.json({ ok:true });
     });
   });
 });
 
+// ====== Unified Register/Login ======
 app.post(
   "/register",
   authLimiter,
@@ -604,13 +638,6 @@ app.post(
         setCookie(res, "floosy_token", token, { maxAge: 7 * 24 * 60 * 60 * 1000 });
         const csrf = crypto.randomBytes(16).toString("hex");
         setReadableCookie(res, "csrf_token", csrf, { maxAge: 7 * 24 * 60 * 60 * 1000 });
-        // Logout (مسح الكوكي)
-app.post('/logout', requireUserAuth, requireCsrfIfCookie, (req, res) => {
-  setCookie(res, 'floosy_token', '', { maxAge: 0 });
-  setReadableCookie(res, 'csrf_token', '', { maxAge: 0 });
-  res.json({ ok: true });
-});
-
 
         // Send email verify code (fire-and-forget)
         (async () => {
@@ -681,8 +708,8 @@ app.post(
         const csrf = crypto.randomBytes(16).toString("hex");
         setReadableCookie(res, "csrf_token", csrf, { maxAge: 7 * 24 * 60 * 60 * 1000 });
 
-        const { id, full_name, email, balance, allow_services, email_verified } = row;
-        res.json({ user: { id, full_name, phone: row.phone, email, balance, allow_services, email_verified }, token, csrf });
+        const { id, full_name, email: em, balance, allow_services, email_verified } = row;
+        res.json({ user: { id, full_name, phone: row.phone, email: em, balance, allow_services, email_verified }, token, csrf });
       }
     );
   }
@@ -691,7 +718,7 @@ app.post(
 // ====== Email Verify ======
 app.post(
   "/resend-verify",
-  
+  otpLimiter,
   body("email").custom(isValidEmail).withMessage("بريد غير صالح"),
   (req, res) => {
     const errors = validationResult(req);
@@ -722,23 +749,96 @@ app.post(
   }
 );
 
+// ===== Change email while pending =====
+app.post(
+  "/change-email",
+  body("old_email").custom(isValidEmail).withMessage("old_email غير صالح"),
+  body("new_email").custom(isValidEmail).withMessage("new_email غير صالح"),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    const old_email = String(req.body.old_email || "").trim().toLowerCase();
+    const new_email = String(req.body.new_email || "").trim().toLowerCase();
+
+    if (old_email === new_email) {
+      return res.status(400).json({ error: "البريد الجديد يطابق البريد الحالي" });
+    }
+
+    db.get(
+      `SELECT id, full_name, email_verified FROM users WHERE email = ? LIMIT 1`,
+      [old_email],
+      (e1, u) => {
+        if (e1) return res.status(500).json({ error: "DB error (lookup old_email)" });
+        if (!u) return res.status(404).json({ error: "الحساب غير موجود للبريد الحالي" });
+        if (Number(u.email_verified) === 1) {
+          return res.status(400).json({ error: "لا يمكن تغيير البريد لحساب مُفعّل" });
+        }
+
+        db.get(
+          `SELECT id FROM users WHERE email = ? LIMIT 1`,
+          [new_email],
+          (e2, ex) => {
+            if (e2) return res.status(500).json({ error: "DB error (check new_email)" });
+            if (ex && ex.id !== u.id) {
+              return res.status(409).json({ error: "البريد الجديد مستخدم من قبل" });
+            }
+
+            db.run(
+              `UPDATE users SET email = ?, email_verified = 0 WHERE id = ?`,
+              [new_email, u.id],
+              (e3) => {
+                if (e3) return res.status(500).json({ error: "DB error (update email)" });
+
+                const code = String(crypto.randomInt(100000, 999999));
+                const now = new Date();
+                const expires = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+                const created = now.toISOString();
+
+                db.run(
+                  `INSERT INTO email_verifications (user_id, email, code, expires_at, created_at, used)
+                   VALUES (?, ?, ?, ?, ?, 0)`,
+                  [u.id, new_email, code, expires, created],
+                  async (e4) => {
+                    if (e4) return res.status(500).json({ error: "تعذّر حفظ كود جديد" });
+
+                    const link = `${APP_BASE_URL}/verify-email?code=${encodeURIComponent(code)}&email=${encodeURIComponent(new_email)}`;
+                    try { await sendVerifyEmail({ to: new_email, name: u.full_name, code, link }); } catch {}
+
+                    return res.json({ ok: true, email: new_email });
+                  }
+                );
+              }
+            );
+          }
+        );
+      }
+    );
+  }
+);
+
 app.get("/verify-email", (req, res) => {
   const code = String(req.query.code || "").trim();
   const email = String(req.query.email || "").trim().toLowerCase();
   if (!code || !email) return res.status(400).send("رابط غير صالح");
 
+  const ip = clientIp(req);
+
+  // تحقق من عدد المحاولات
+  if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
+    return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
+  }
   db.get(
     `SELECT ev.id, ev.user_id, ev.expires_at, ev.used
      FROM email_verifications ev
      WHERE ev.email = ? AND ev.code = ?
      ORDER BY ev.id DESC LIMIT 1`,
     [email, code],
-    
     (err, row) => {
       if (err) return res.status(500).send("خطأ الخادم");
-      if (!row) return res.status(400).send("الكود غير صحيح");
-      if (row.used) return res.status(400).send("تم استخدام الكود سابقًا");
-      if (new Date(row.expires_at).getTime() < Date.now()) return res.status(400).send("انتهت صلاحية الكود");
+      if (!row)  { recordOtpFail(email, ip); return res.status(400).json({ error: "الكود غير صحيح" }); }
+      if (row.used) { recordOtpFail(email, ip); return res.status(400).json({ error: "تم استخدام الكود سابقًا" }); }
+      if (new Date(row.expires_at).getTime() < Date.now()) { recordOtpFail(email, ip); return res.status(400).json({ error: "انتهت صلاحية الكود" }); }
 
       db.serialize(() => {
         db.run(`UPDATE users SET email_verified = 1 WHERE id = ?`, [row.user_id]);
@@ -756,10 +856,60 @@ app.get("/verify-email", (req, res) => {
     }
   );
 });
+// ====== Login/OTP lock helpers ======
+const failedLogins = new Map();
+const OTP_DAILY_MAX = 3;
+const otpVerifyAttempts = new Map(); // key: `${email}|${ip}|${day}` -> count
+
+function clientIp(req) {
+  const xf = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return xf || req.ip || req.connection?.remoteAddress || '';
+}
+function otpKey(email, ip) {
+  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return `${String(email||'').toLowerCase().trim()}|${ip}|${day}`;
+}
+function getOtpAttempts(email, ip) {
+  const k = otpKey(email, ip);
+  return Number(otpVerifyAttempts.get(k) || 0);
+}
+function recordOtpFail(email, ip) {
+  const k = otpKey(email, ip);
+  otpVerifyAttempts.set(k, getOtpAttempts(email, ip) + 1);
+}
+function resetOtpAttempts(email, ip) {
+  otpVerifyAttempts.delete(otpKey(email, ip));
+}
+function verifyOtpGuard(req, res, next) {
+  const email = String(req.body?.email || '').toLowerCase().trim();
+  const ip = clientIp(req);
+  if (!email) return next();
+  if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
+    return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
+  }
+  next();
+}
+function checkLock(key) {
+  const now = Date.now();
+  const rec = failedLogins.get(key);
+  if (!rec) return false;
+  if (rec.until && rec.until > now) return true;
+  if (rec.until && rec.until <= now) failedLogins.delete(key);
+  return false;
+}
+function recordFail(key) {
+  const now = Date.now();
+  const rec = failedLogins.get(key) || { count: 0, until: 0 };
+  rec.count += 1;
+  if (rec.count >= 5) { rec.until = now + 15 * 60 * 1000; rec.count = 0; }
+  failedLogins.set(key, rec);
+}
+function recordSuccess(key) { failedLogins.delete(key); }
 
 // ====== Email Verify (POST, JSON) ======
 app.post(
   "/verify-email",
+  verifyOtpGuard,
   body("email").custom(isValidEmail).withMessage("بريد غير صالح"),
   body("code").isLength({ min: 4 }).withMessage("كود غير صالح"),
   (req, res) => {
@@ -768,6 +918,7 @@ app.post(
 
     const email = String(req.body.email || "").toLowerCase().trim();
     const code  = String(req.body.code  || "").trim();
+    const ip = clientIp(req);
 
     db.get(
       `SELECT ev.id, ev.user_id, ev.email, ev.expires_at, ev.used
@@ -781,15 +932,12 @@ app.post(
         if (row.used) return res.status(400).json({ error: "تم استخدام الكود سابقًا" });
         if (new Date(row.expires_at).getTime() < Date.now()) return res.status(400).json({ error: "انتهت صلاحية الكود" });
 
-        // دالة صغيرة تجيب المستخدم ثم تكمل الرد
         const fetchUserAndFinish = (userIdOrNull) => {
           const finishWithUser = (u) => {
-            // علّم الإيميل أنه مُفعّل وعلّم الكود مستخدَم
             db.serialize(() => {
               if (u?.id) db.run(`UPDATE users SET email_verified = 1 WHERE id = ?`, [u.id]);
               db.run(`UPDATE email_verifications SET used = 1 WHERE id = ?`, [row.id], (e2) => {
                 if (e2) return res.status(500).json({ error: "خطأ أثناء التحديث" });
-
                 if (!u) return res.status(404).json({ error: "المستخدم غير موجود بعد التفعيل" });
 
                 const token = jwt.sign({ id: u.id, phone: u.phone }, JWT_SECRET, { expiresIn: "7d" });
@@ -797,8 +945,8 @@ app.post(
                 const csrf = crypto.randomBytes(16).toString("hex");
                 setReadableCookie(res, "csrf_token", csrf, { maxAge: 7 * 24 * 60 * 60 * 1000 });
 
-                // لو مافيش pin_hash → ودّيه يعمل PIN
                 const needPin = !u.pin_hash;
+                resetOtpAttempts(email, ip);
                 return res.json({ ok: true, set_pin: needPin, token, csrf, user: {
                   id: u.id, full_name: u.full_name, phone: u.phone, email: u.email,
                   balance: u.balance, allow_services: u.allow_services, email_verified: u.email_verified
@@ -815,7 +963,6 @@ app.post(
               (e3, u) => {
                 if (e3) return res.status(500).json({ error: "المستخدم غير موجود بعد التفعيل" });
                 if (u) return finishWithUser(u);
-                // fallback بالبريد
                 db.get(
                   `SELECT id, full_name, phone, email, balance, allow_services, email_verified, pin_hash
                    FROM users WHERE email = ?`,
@@ -825,7 +972,6 @@ app.post(
               }
             );
           } else {
-            // مافيش user_id صالح → جرّب بالبريد مباشرة
             db.get(
               `SELECT id, full_name, phone, email, balance, allow_services, email_verified, pin_hash
                FROM users WHERE email = ?`,
@@ -841,15 +987,12 @@ app.post(
   }
 );
 
-// ===== Forgot Password (OTP to email) =====
-
-// POST /forgot-password/send-otp  — send 6-digit code to email
+// ===== Forgot Password =====
 app.post("/forgot-password/send-otp", async (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();
   if (!isValidEmail(email)) {
     return res.status(400).json({ error: "بريد غير صالح" });
   }
-  // هل الإيميل موجود؟
   db.get(`SELECT id, full_name FROM users WHERE email = ?`, [email], async (e, row) => {
     if (e) return res.status(500).json({ error: "DB error" });
     if (!row) return res.status(404).json({ error: "الحساب غير موجود" });
@@ -873,36 +1016,41 @@ app.post("/forgot-password/send-otp", async (req, res) => {
   });
 });
 
-// POST /forgot-password/verify-otp — confirm the 6-digit code
-app.post("/forgot-password/verify-otp", (req, res) => {
+app.post('/forgot-pin/verify-otp', verifyOtpGuard, (req,res)=>{
   const email = String(req.body.email || "").trim().toLowerCase();
   const otp   = String(req.body.otp   || "").trim();
-
   if (!email || !otp) return res.status(400).json({ error:"بيانات ناقصة" });
 
-  db.get(`
-    SELECT id,user_id,expires_at,used
-    FROM email_verifications
-    WHERE email=? AND code=?
-    ORDER BY id DESC LIMIT 1
-  `, [email, otp], (err,row)=>{
-    if (err) return res.status(500).json({ error:"DB error" });
-    if (!row) return res.status(400).json({ error:"الكود غير صحيح" });
-    if (row.used) return res.status(400).json({ error:"الكود مستخدم" });
-    if (new Date(row.expires_at) < new Date()) return res.status(400).json({ error:"انتهت صلاحية الكود" });
+  const ip = clientIp(req);
+  if (getOtpAttempts(email, ip) >= OTP_DAILY_MAX) {
+    return res.status(429).json({ error: "محاولات كثيرة اليوم. حاول غدًا أو اطلب كود جديد." });
+  }
 
-    // ✅ OK → علّم أنه مستخدم
-    db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id]);
-    return res.json({ ok:true });
+  db.get(
+    `SELECT id, code, expires_at, used 
+     FROM email_verifications
+     WHERE email=? 
+     ORDER BY id DESC LIMIT 1`,
+    [email],
+    (err,row)=>{
+      if(err) return res.status(500).json({ error:"DB error" });
+      if(!row) { recordOtpFail(email, ip); return res.status(400).json({ error:"كود غير صالح" }); }
+      if(row.used) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود مستخدم" }); }
+      if(new Date(row.expires_at) < new Date()) { recordOtpFail(email, ip); return res.status(400).json({ error:"انتهت صلاحية الكود" }); }
+      if(row.code !== otp) { recordOtpFail(email, ip); return res.status(400).json({ error:"الكود غير صحيح" }); }
+
+      db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id], ()=>{
+        resetOtpAttempts(email, ip);
+        return res.json({ ok:true });
+      });
   });
 });
-// ====== Forgot-password: reset password ======
+
 app.post('/forgot-password/reset', async (req, res) => {
   const { email, new_password } = req.body || {};
   if (!email || !new_password) {
     return res.status(400).json({ error: "بيانات ناقصة" });
   }
-  // تحقق من قوة الباسوورد (اختياري)
   const strong = /[a-z]/.test(new_password) && /[A-Z]/.test(new_password) && /\d/.test(new_password) && new_password.length >= 8;
   if (!strong) {
     return res.status(400).json({ error: "كلمة المرور ضعيفة" });
@@ -920,9 +1068,8 @@ app.post('/forgot-password/reset', async (req, res) => {
   });
 });
 
-// ========== Forgot PIN ==========
+// ========== Forgot PIN (موحّد) ==========
 app.post("/forgot-pin/send-otp", requireUserAuth, async (req, res) => {
-  // سيرسل كود إلى الإيميل الخاص بالمستخدم الحالي
   const userId = req.user.id;
   db.get(`SELECT email, full_name FROM users WHERE id=?`, [userId], async (e, u) => {
     if (e || !u) return res.status(400).json({ error: "مستخدم غير موجود" });
@@ -944,74 +1091,22 @@ app.post("/forgot-pin/send-otp", requireUserAuth, async (req, res) => {
     );
   });
 });
-// ===== Forgot PIN (send + verify) =====
-app.post('/forgot-pin/send-otp', (req, res) => {
-  const email = String(req.body.email || "").trim().toLowerCase();
-  if (!isValidEmail(email)) return res.status(400).json({ error: "بريد غير صالح" });
 
-  const code = String(crypto.randomInt(100000,999999));
-  const expires = addMinutesISO(15);
-  const now = nowISO();
-
-  db.run(`INSERT INTO email_verifications (user_id,email,code,expires_at,created_at,used)
-          VALUES (0,?,?,?, ?,0)`,
-    [email, code, expires, now], async (err)=>{
-      if (err) return res.status(500).json({ error: "فشل الإرسال" });
-      try {
-        await sendVerifyEmail({to:email,name:"",code,link:""});
-      } catch{}
-      return res.json({ ok:true });
+app.post("/forgot-pin/verify", requireUserAuth, async (req,res)=>{
+  const {otp} = req.body||{};
+  db.get(
+    `SELECT id,code,expires_at,used FROM email_verifications
+      WHERE user_id=? ORDER BY id DESC LIMIT 1`, 
+    [req.user.id], (e,row)=>{
+      if(e) return res.status(500).json({error:"DB"});
+      if(!row||row.used) return res.status(400).json({error:"كود غير صالح"});
+      if(row.code!==String(otp)) return res.status(400).json({error:"الكود غير صحيح"});
+      if(new Date(row.expires_at)<new Date()) return res.status(400).json({error:"انتهت صلاحية الكود"});
+      db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id]);
+      res.json({ok:true});
     });
 });
 
-app.post('/forgot-pin/verify-otp', (req,res)=>{
-  const { email, otp } = req.body || {};
-  db.get(`SELECT id,code,expires_at,used FROM email_verifications
-          WHERE email=? ORDER BY id DESC LIMIT 1`,
-    [String(email||"").toLowerCase()], (err,row)=>{
-      if(err) return res.status(500).json({ error:"DB error" });
-      if(!row || row.used) return res.status(400).json({ error:"كود غير صالح" });
-      if(row.code!==String(otp)) return res.status(400).json({ error:"الكود غير صحيح" });
-      if(new Date(row.expires_at) < new Date()) return res.status(400).json({ error:"انتهت صلاحية الكود" });
-
-      db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id], ()=>{
-        return res.json({ ok:true });
-      });
-  });
-});
-
-// التحقق من كود forgot-pin → إذا صح → يرجعه {ok:true}
-app.post("/forgot-pin/verify", requireUserAuth, (req,res)=>{
-  const { code } = req.body || {};
-  if(!code) return res.status(400).json({ error: "كود ناقص" });
-  const email = req.user.email;
-
-  db.get(`
-      SELECT id,expires_at,used
-      FROM email_verifications
-      WHERE email=? AND code=? ORDER BY id DESC LIMIT 1
-  `,[email,String(code)],(e,row)=>{
-    if(e||!row) return res.status(400).json({ error:"كود خطأ" });
-    if(row.used) return res.status(400).json({error:"الكود مستخدم"});
-    if(new Date(row.expires_at) < new Date()) return res.status(400).json({error:"انتهت صلاحية الكود"});
-
-    db.run(`UPDATE email_verifications SET used=1 WHERE id=?`,[row.id]);
-    return res.json({ok:true});
-  });
-});
-
-// ====== Set Login PIN ======
-app.post("/set-pin", requireUserAuth, requireCsrfIfCookie, async (req, res) => {
-  const pin = String(req.body.pin || "").trim();
-  if (!/^\d{6}$/.test(pin))
-    return res.status(400).json({ error: "PIN غير صالح" });
-
-  const hash = await bcrypt.hash(pin, 10);
-  db.run(`UPDATE users SET pin_hash=? WHERE id=?`, [hash, req.user.id], (err) => {
-    if (err) return res.status(500).json({ error: "تعذّر الحفظ" });
-    res.json({ ok: true });
-  });
-});
 // ====== Set Login PIN ======
 app.post("/set-pin", requireUserAuth, requireCsrfIfCookie, async (req, res) => {
   const pin = String(req.body.pin || "").trim();
@@ -1053,7 +1148,7 @@ app.get("/me", requireUserAuth, (req, res) => {
 });
 
 app.post("/account-lookup", requireUserAuth, requireCsrfIfCookie, (req, res) => {
-    // طبّع الإدخال: شِل الشرطات والفراغات والبادئة LY-
+  // طبّع الإدخال: شِل الشرطات والفراغات والبادئة LY-
   const input = String(req.body.account || '').toUpperCase().trim();
   const accNorm = input.replace(/\s+/g, '').replace(/^LY-?/, '').replace(/-/g, '');
 
@@ -1143,11 +1238,9 @@ app.post("/topup-pin/new", requireUserAuth, requireCsrfIfCookie, (req, res) => {
     (e1, active) => {
       if (e1) return res.status(500).json({ error: "DB error" });
       if (active) {
-        // لسه نشط → نرجّع نفس الـ PIN (لا نولّد جديد)
         return res.json({ pin: active.pin, expires_at: active.expires_at, existing: true });
       }
 
-      // نولّد PIN جديد 6 أرقام
       const pin = String(Math.floor(100000 + Math.random() * 900000));
       const expires = new Date(now.getTime() + TOPUP_PIN_TTL_SEC * 1000).toISOString();
 
@@ -1164,23 +1257,7 @@ app.post("/topup-pin/new", requireUserAuth, requireCsrfIfCookie, (req, res) => {
   );
 });
 
-app.post("/topup-pin/new", requireUserAuth, requireCsrfIfCookie, (req, res) => {
-  const pin = String(crypto.randomInt(0, 999999)).padStart(6, "0");
-  const created_at = nowISO();
-  const expires_at = addMinutesISO(10);
-  db.serialize(() => {
-    db.run(`UPDATE topup_pins SET revoked=1 WHERE user_id=? AND revoked=0`, [req.user.id]);
-    db.run(
-      `INSERT INTO topup_pins (user_id, pin, expires_at, created_at, revoked) VALUES (?, ?, ?, ?, 0)`,
-      [req.user.id, pin, expires_at, created_at],
-      function (err) {
-        if (err) return res.status(500).json({ error: "تعذّر إنشاء PIN" });
-        res.json({ pin, expires_at });
-      }
-    );
-  });
-});
-
+// ====== Transactions & Transfers ======
 app.get("/transactions", requireUserAuth, (req, res) => {
   db.all(
     `SELECT id, type, amount, balance_after, meta, created_at
@@ -1196,7 +1273,6 @@ app.get("/transactions", requireUserAuth, (req, res) => {
   );
 });
 
-// Transfer (user → user)
 app.post(
   "/transfer",
   requireUserAuth,
@@ -1305,7 +1381,6 @@ app.post(
                   [dest.id, amt, d2?.balance ?? 0, metaIn, now]
                 );
 
-                // Optional: save recipient
                 const finish = () => {
                   db.run("COMMIT", (eC) => {
                     if (eC) return res.status(500).json({ error: "فشل العملية" });
@@ -1362,7 +1437,6 @@ app.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
-    // شرط السماح بدخول الخدمات
     db.get(`SELECT allow_services FROM users WHERE id=?`, [req.user.id], (e,u)=>{
       if(e) return res.status(500).json({ error: "خطأ الخادم" });
       if(!u || Number(u.allow_services)!==1) return res.status(403).json({ error: "غير مخوّل لاستخدام الخدمات" });
@@ -1444,75 +1518,6 @@ app.get("/recipients", requireUserAuth, (req, res) => {
   );
 });
 
-
-// ====== Account Number & Topup PIN ======
-function randomDigits(n){
-  let s = ""; for (let i=0;i<n;i++) s += Math.floor(Math.random()*10);
-  return s;
-}
-
-// GET /account-number  — يرجّع رقم حساب المستخدم، ويولّده لو مش موجود
-app.get("/account-number", requireUserAuth, (req, res) => {
-  db.get(`SELECT account_number FROM users WHERE id = ?`, [req.user.id], (e, row) => {
-    if (e) return res.status(500).json({ error: "DB error" });
-    if (row?.account_number) return res.json({ account_number: row.account_number });
-
-    // ولّد رقم فريد 12 رقم وحاول لحد يظبط (نادر جدًا يصير تضارب)
-    const tryGen = (tries=0) => {
-      if (tries > 5) return res.status(500).json({ error: "failed to allocate account" });
-      const acc = randomDigits(12);
-      db.get(`SELECT 1 FROM users WHERE account_number = ?`, [acc], (e2, ex) => {
-        if (e2) return res.status(500).json({ error: "DB error" });
-        if (ex) return tryGen(tries+1);
-        db.run(`UPDATE users SET account_number = ? WHERE id = ?`, [acc, req.user.id], (e3) => {
-          if (e3) return res.status(500).json({ error: "DB error" });
-          return res.json({ account_number: acc });
-        });
-      });
-    };
-    tryGen();
-  });
-});
-
-// GET /topup-pin — يرجّع الـ PIN الفعّال (لو موجود)
-app.get("/topup-pin", requireUserAuth, (req, res) => {
-  const now = new Date().toISOString();
-  db.get(
-    `SELECT pin, expires_at
-     FROM topup_pins
-     WHERE user_id = ? AND revoked = 0 AND expires_at > ?
-     ORDER BY id DESC LIMIT 1`,
-    [req.user.id, now],
-    (e, row) => {
-      if (e) return res.status(500).json({ error: "DB error" });
-      if (!row) return res.json({ pin: null });
-      return res.json({ pin: row.pin, expires_at: row.expires_at });
-    }
-  );
-});
-
-// POST /topup-pin/new — يولّد PIN جديد (6 أرقام) وينسخن القديم
-app.post("/topup-pin/new", requireUserAuth, requireCsrfIfCookie, (req, res) => {
-  const now = new Date();
-  const nowISO = now.toISOString();
-  const expISO = new Date(now.getTime() + 10 * 60 * 1000).toISOString(); // 10 دقائق
-  const pin = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
-
-  db.serialize(() => {
-    db.run(`UPDATE topup_pins SET revoked = 1 WHERE user_id = ? AND revoked = 0 AND expires_at > ?`, [req.user.id, nowISO], (e1) => {
-      if (e1) return res.status(500).json({ error: "DB error" });
-      db.run(
-        `INSERT INTO topup_pins (user_id, pin, expires_at, created_at, revoked) VALUES (?, ?, ?, ?, 0)`,
-        [req.user.id, pin, expISO, nowISO],
-        (e2) => {
-          if (e2) return res.status(500).json({ error: "DB error" });
-          return res.json({ ok: true, pin, expires_at: expISO });
-        }
-      );
-    });
-  });
-});
-
 // ====== Admin auth (session) ======
 
 // ربط هذا الجهاز للأدمن
@@ -1552,7 +1557,6 @@ app.post(
 
     const { username, password } = matchedData(req, { locations: ["body"] });
 
-    // lock key
     const key = `A:${username}`;
     if (checkLock(key)) return res.status(429).json({ error: "محاولات كثيرة. جرّب لاحقًا." });
 
@@ -1590,8 +1594,6 @@ app.get("/admin/session", requireAdmin, (req, res) => {
 });
 
 // ====== Admin APIs ======
-
-// إنشاء حساب عميل جديد من الأدمن (allow_services=1)
 app.post(
   "/admin/create-user",
   requireAdmin,
@@ -1626,7 +1628,6 @@ app.post(
   }
 );
 
-// counts
 app.get("/admin/users-count", requireAdmin, (_req, res) => {
   db.get(`SELECT COUNT(*) AS cnt FROM users`, (err, row) => {
     if (err) return res.status(500).json({ error: "خطأ الخادم" });
@@ -1634,7 +1635,6 @@ app.get("/admin/users-count", requireAdmin, (_req, res) => {
   });
 });
 
-// List users (+filters)
 app.get("/admin/users", requireAdmin, (req, res) => {
   const isActive = req.query.is_active;
   const verified = req.query.verified;
@@ -1655,7 +1655,6 @@ app.get("/admin/users", requireAdmin, (req, res) => {
   );
 });
 
-// Search users (+filters)
 app.get("/admin/search-user", requireAdmin, (req, res) => {
   const q = cleanStr(req.query.q || "");
   const isActive = req.query.is_active;
@@ -1682,7 +1681,6 @@ app.get("/admin/search-user", requireAdmin, (req, res) => {
   );
 });
 
-// Update balance (admin)
 app.post("/admin/update-balance", requireAdmin, requireCsrfIfCookie, (req, res) => {
   const phone = cleanStr(req.body?.phone || "");
   const a = Number(req.body?.amount);
@@ -1712,7 +1710,6 @@ app.post("/admin/update-balance", requireAdmin, requireCsrfIfCookie, (req, res) 
   });
 });
 
-// Toggle active (admin)
 app.post("/admin/set-active", requireAdmin, requireCsrfIfCookie, (req, res) => {
   const uid = Number(req.body?.user_id);
   const isActive = Number(req.body?.is_active);
@@ -1728,7 +1725,6 @@ app.post("/admin/set-active", requireAdmin, requireCsrfIfCookie, (req, res) => {
   });
 });
 
-// User tx (admin)
 app.get("/admin/user/:id/transactions", requireAdmin, (req, res) => {
   const uid = Number(req.params.id);
   if (!Number.isFinite(uid)) return res.status(400).json({ error: "معرّف غير صحيح" });
@@ -1743,7 +1739,6 @@ app.get("/admin/user/:id/transactions", requireAdmin, (req, res) => {
   );
 });
 
-// Requests (admin)
 app.get("/admin/requests", requireAdmin, (req, res) => {
   const status = cleanStr(req.query.status || "pending");
   const type = cleanStr(req.query.type || "");
@@ -1769,7 +1764,6 @@ app.get("/admin/requests", requireAdmin, (req, res) => {
   );
 });
 
-// حدّ التعبئة اليومي
 const DAILY_TOPUP_LIMIT = 1000;
 
 app.post("/admin/requests/:id/approve", requireAdmin, requireCsrfIfCookie, (req, res) => {
@@ -1829,7 +1823,6 @@ app.post("/admin/requests/:id/approve", requireAdmin, requireCsrfIfCookie, (req,
 
       if (r.type !== "topup") return finish();
 
-      // تحقق حدّ اليوم
       const start = new Date();
       start.setHours(0, 0, 0, 0);
       const startISO = start.toISOString();
@@ -1902,61 +1895,7 @@ app.post(
   }
 );
 
-// ====== Login locks (map) ======
-const failedLogins = new Map();
-function checkLock(key) {
-  const now = Date.now();
-  const rec = failedLogins.get(key);
-  if (!rec) return false;
-  if (rec.until && rec.until > now) return true;
-  if (rec.until && rec.until <= now) failedLogins.delete(key);
-  return false;
-}
-function recordFail(key) {
-  const now = Date.now();
-  const rec = failedLogins.get(key) || { count: 0, until: 0 };
-  rec.count += 1;
-  if (rec.count >= 5) { rec.until = now + 15 * 60 * 1000; rec.count = 0; }
-  failedLogins.set(key, rec);
-}
-function recordSuccess(key) { failedLogins.delete(key); }
-// ====== Forgot PIN ======
-app.post('/forgot-pin/send', requireUserAuth, async (req,res)=>{
-  // نرسل OTP جديد للإيميل الحالي
-  const uid = req.user.id;
-  db.get(`SELECT id, email, full_name FROM users WHERE id=?`, [uid], async (e,u)=>{
-    if(e||!u) return res.status(500).json({error:'DB'});
-    const code = String(crypto.randomInt(100000,999999));
-    const expires = addMinutesISO(10);
-    const created = nowISO();
-    db.run(`INSERT INTO email_verifications (user_id,email,code,expires_at,created_at,used)
-            VALUES (?,?,?, ?, ?,0)`, [u.id, u.email, code, expires, created], async(err)=>{
-      if(err) return res.status(500).json({error:'فشل الإرسال'});
-      try{ await sendVerifyEmail({to:u.email,name:u.full_name,code,link:""});}catch{}
-      res.json({ok:true});
-    });
-  });
-});
-
-app.post('/forgot-pin/verify', requireUserAuth, async (req,res)=>{
-  // يتحقق من OTP ثم يسمح له بالذهاب إلى create-pin.html
-  const {otp} = req.body||{};
-  db.get(
-    `SELECT id,code,expires_at,used FROM email_verifications
-      WHERE user_id=? ORDER BY id DESC LIMIT 1`, 
-    [req.user.id], (e,row)=>{
-      if(e) return res.status(500).json({error:"DB"});
-      if(!row||row.used) return res.status(400).json({error:"كود غير صالح"});
-      if(row.code!==String(otp)) return res.status(400).json({error:"الكود غير صحيح"});
-      if(new Date(row.expires_at)<new Date()) return res.status(400).json({error:"انتهت صلاحية الكود"});
-      // ok
-      db.run(`UPDATE email_verifications SET used=1 WHERE id=?`, [row.id]);
-      res.json({ok:true});
-    });
-});
-
 // ====== Start ======
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
 });
-

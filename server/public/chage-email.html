@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تغيير البريد الإلكتروني - FLOOSY</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb;
+      --primary:#22c55e; --primary-hover:#16a34a; --border:rgba(148,163,184,.15);
+      --shadow:0 12px 35px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; display:grid; place-items:center; padding:20px;
+      background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%); color:var(--text);
+      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .card{
+      width:min(520px,94vw); background:var(--card); border:1px solid var(--border);
+      border-radius:16px; box-shadow:var(--shadow); padding:20px;
+    }
+    h1{ margin:0 0 8px; font-size:22px; text-align:center }
+    p{ margin:6px 0 16px; color:var(--muted); line-height:1.6; text-align:center }
+    label{ display:block; margin-top:12px; font-size:14px; color:var(--muted) }
+    input{
+      width:100%; padding:12px; margin-top:6px; border:1px solid var(--border); border-radius:10px;
+      background:#1f2937; color:var(--text); outline:none;
+    }
+    input:focus{ border-color:#3b82f6; box-shadow:0 0 0 6px rgba(56,189,248,.15) }
+    .btn-row{ display:flex; gap:10px; margin-top:16px }
+    .btn{
+      flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); cursor:pointer; font-weight:700;
+      background:#0b1324; color:#e5e7eb;
+    }
+    .btn.primary{ background:var(--primary); border-color:transparent; color:#062b1a }
+    .btn.primary:hover{ background:var(--primary-hover) }
+    .btn:disabled{ opacity:.6; cursor:not-allowed }
+    .msg{ margin-top:12px; padding:10px; border-radius:10px; display:none; text-align:center; font-size:14px }
+    .ok{ background:#065f46; color:#d1fae5 }
+    .err{ background:#7f1d1d; color:#fee2e2 }
+    .hint{ color:var(--muted); font-size:12px; margin-top:6px }
+    .link{ text-align:center; margin-top:12px; font-size:14px }
+    .link a{ color:#22c55e; text-decoration:none }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>تغيير البريد الإلكتروني</h1>
+    <p>أدخل بريدًا جديدًا لإرسال رمز التحقق (OTP) إليه.</p>
+
+    <label>البريد الإلكتروني الجديد</label>
+    <input id="email" type="email" placeholder="name@example.com" autocomplete="email" />
+    <div class="hint">سيرسل النظام كود تحقق جديد لهذا البريد.</div>
+
+    <div id="msg" class="msg"></div>
+
+    <div class="btn-row">
+      <button id="backBtn" class="btn">رجوع</button>
+      <button id="saveBtn" class="btn primary" disabled>تأكيد</button>
+    </div>
+
+    <div class="link">
+      <a href="/verify-email.html">العودة لصفحة التحقق</a>
+    </div>
+  </main>
+
+  <script>
+    // ===== Config =====
+    const CHANGE_EMAIL_ENDPOINT = "/change-email"; // POST { old_email, new_email }
+    const VERIFY_PAGE = "/verify-email.html";
+
+    // ===== Elements =====
+    const emailInput = document.getElementById('email');
+    const saveBtn = document.getElementById('saveBtn');
+    const backBtn = document.getElementById('backBtn');
+    const msg = document.getElementById('msg');
+
+    // Prefill from localStorage if exists
+    const existing = (localStorage.getItem('signup_email') || '').trim();
+    if (existing) emailInput.value = existing;
+
+    // Helpers
+    function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e||'').trim()); }
+    function show(t, ok=false){
+      msg.textContent = t; msg.className = 'msg ' + (ok ? 'ok' : 'err'); msg.style.display = 'block';
+    }
+    function hide(){ msg.style.display = 'none'; }
+    function setLoading(on){
+      saveBtn.disabled = on || !isValidEmail(emailInput.value);
+      backBtn.disabled = on;
+      emailInput.disabled = on;
+      saveBtn.textContent = on ? 'جارٍ الإرسال…' : 'تأكيد';
+    }
+
+    // Enable/disable save on input
+    emailInput.addEventListener('input', ()=>{
+      hide();
+      saveBtn.disabled = !isValidEmail(emailInput.value);
+    });
+
+    backBtn.addEventListener('click', ()=>{ window.location.href = VERIFY_PAGE; });
+
+    saveBtn.addEventListener('click', async ()=>{
+      hide();
+      const email = (emailInput.value || '').trim();
+      if (!isValidEmail(email)){ show('البريد غير صالح'); return; }
+
+      setLoading(true);
+      try{
+const old_email = (localStorage.getItem('signup_email') || '').trim();
+const new_email = (email || '').trim();
+
+const r = await fetch(CHANGE_EMAIL_ENDPOINT, {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body: JSON.stringify({ old_email, new_email })
+});
+        const data = await r.json().catch(()=>({}));
+
+        if (!r.ok){
+          throw new Error(data.error || data.message || 'تعذّر إرسال الكود');
+        }
+
+        // Save & redirect
+localStorage.setItem('signup_email', new_email);
+show('تم إرسال كود جديد إلى بريدك ✅', true);
+setTimeout(()=>{ window.location.href = VERIFY_PAGE; }, 600);
+      }catch(e){
+        show(e.message || 'تعذّر الإرسال. حاول لاحقًا.');
+      }finally{
+        setLoading(false);
+      }
+    });
+
+    // Init state
+    saveBtn.disabled = !isValidEmail(emailInput.value);
+  </script>
+</body>
+</html>
